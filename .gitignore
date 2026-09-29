@@ -7,3 +7,5 @@ __pycache__/
 *.pyc
 *.log
 .playwright-mcp/
+.venv/
+work/
