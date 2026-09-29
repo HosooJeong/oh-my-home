@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 
 from ..contracts import CategoryResult, Evidence, digest
+from ..geo import distance_m, in_supported_window
 
 METRICS = {
     "grocery_straight_line_distance_m": "supermarket",
@@ -16,18 +17,6 @@ METRICS = {
 CONVENIENCE_BRAND = re.compile(r"^(gs25|지에스25|cu|씨유|세븐일레븐|이마트24|미니스톱)", re.I)
 SUPERMARKET_BRAND = re.compile(r"^(gs더프레시|지에스더프레시|gs수퍼|이마트에브리데이|홈플러스익스프레스)", re.I)
 SOURCE = "https://www.data.go.kr/data/15083033/fileData.do"
-
-
-def distance_m(lat1, lon1, lat2, lon2):
-    """Haversine on decimal-degree coordinates, spherical mean Earth radius 6,371,008.8m."""
-    a, b = math.radians(lat1), math.radians(lat2)
-    h = math.sin((b-a)/2)**2 + math.cos(a)*math.cos(b)*math.sin(math.radians(lon2-lon1)/2)**2
-    return 6371008.8 * 2 * math.asin(math.sqrt(min(1.0, max(0.0, h))))
-
-
-def in_supported_window(lat, lon):
-    # Same coarse validation window as the downloaded dataset. Not a city boundary polygon.
-    return 34.9 <= lat <= 35.5 and 127.8 <= lon <= 128.5
 
 
 class ShopIndex:

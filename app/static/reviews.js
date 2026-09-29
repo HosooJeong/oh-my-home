@@ -17,7 +17,7 @@ function updateReviewControls() {
 }
 function renderReviews() {
   if (!state.run?.report) return resetReviews();
-  const facilities = Object.values(state.run.facilities);
+  const facilities = Object.values(state.run.facilities).filter(f => f.kind === 'shops');
   if (reviewState.key !== state.run.review_key) {
     resetReviews(); reviewState.key = state.run.review_key;
     facilities.slice(0, 3).forEach(f => reviewState.selected.add(f.id));

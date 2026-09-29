@@ -1,15 +1,15 @@
 <!doctype html>
 <html lang="ko">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>살자리 · 나에게 맞는 동네 찾기</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script><script src="/reviews.js" defer></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>살자리 · 나에게 맞는 동네 찾기</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script><script src="/transport.js" defer></script><script src="/reviews.js" defer></script></head>
 <body>
 <header><a class="brand" href="/">살자리<span>나에게 맞는 동네 찾기</span></a><a class="quiet-link" href="/samples">자료 지도 보기</a></header>
 <main>
-  <section class="intro"><p class="eyebrow">첫 번째 비교 · 생활과 장보기</p><h1>어떤 생활을<br>담을 곳이 필요해?</h1><p>원하는 생활을 적고, 지도에서 후보를 골라 봐.<br>같은 동네도 네 기준에 따라 다르게 비교할 수 있어.</p></section>
+  <section class="intro"><p class="eyebrow">생활과 교통 · 내 기준으로 비교</p><h1>어떤 생활을<br>담을 곳이 필요해?</h1><p>원하는 생활을 적고, 지도에서 후보를 골라 봐.<br>같은 동네도 네 기준에 따라 다르게 비교할 수 있어.</p></section>
   <div id="status" class="status" role="status" aria-live="polite">자료를 불러오는 중이야.</div>
   <div class="workspace">
     <div class="sidebar">
       <section class="panel"><h2><span class="step">01</span> 내 생활 조건</h2>
-        <fieldset id="intake-fields"><label for="request">어떤 곳에서 살고 싶어?</label><textarea id="request" rows="5" maxlength="4000" placeholder="차 없이 살 거야. 마트에서 자주 장을 보고, 늦게 귀가할 때 편의점도 가까웠으면 좋겠어."></textarea>
+        <fieldset id="intake-fields"><label for="request">어떤 곳에서 살고 싶어?</label><textarea id="request" rows="5" maxlength="4000" placeholder="버스로 출퇴근할 거야. 정류장이 가까웠으면 좋겠고, 마트에서 자주 장을 봐."></textarea>
         <p class="hint">AI가 니즈와 중요도를 정리하고, 필요한 내용만 더 물어볼게. 입력은 연결된 ChatGPT 계정으로 보내져.</p>
         <button id="intake" class="primary" type="button">AI로 조건 정리</button></fieldset>
         <button id="cancel" type="button" hidden>정리 취소</button>
@@ -22,6 +22,22 @@
         </fieldset></form></details>
       </section>
       <section id="profile-panel" class="panel" hidden><h2>정리한 니즈</h2><div id="context"></div><div id="criteria"></div><form id="interview"><div id="questions"></div><button id="answer" type="submit" hidden>답변 반영</button></form>
+        <details id="transport-editor"><summary>교통 조건 확인·수정</summary>
+          <form id="transport-form"><fieldset id="transport-fields">
+            <label for="travel-mode">주 이동수단</label><select id="travel-mode"><option value="unknown">아직 정하지 않았어</option><option value="bus">버스 중심</option><option value="car">자차 중심</option><option value="walking">도보 중심</option><option value="mixed">여러 수단 이용</option></select>
+            <label for="travel-destination">출퇴근·자주 가는 목적지<input id="travel-destination" maxlength="200" placeholder="예: 진주시청"></label>
+            <label for="travel-time">주로 이동하는 시간대<input id="travel-time" maxlength="120" placeholder="예: 평일 오전 8시"></label>
+            <p class="hint">목적지와 시간대는 니즈로 보존해. 현재 비교할 수 있는 교통 조건은 정류장까지의 직선거리야.</p>
+            <label class="check"><input id="include-stop" type="checkbox">정류장 접근성도 비교할래</label>
+            <fieldset id="stop-fields" disabled>
+              <div class="pair"><label>이상적 직선거리 (m)<input id="stop-ideal" type="number" min="0" max="20000" step="any" value="300" required></label><label>만족도 0 거리 (m)<input id="stop-limit" type="number" min="1" max="50000" step="any" value="1000" required></label></div>
+              <div class="pair"><label>교통 분야 중요도<input id="transport-weight" type="number" min="0" max="100" value="30" required></label><label>정류장 조건 중요도<input id="stop-importance" type="number" min="0" max="100" value="100" required></label></div>
+              <p class="hint">300m·1,000m는 편집용 초기값이야. 적용할 때 네 기준으로 확인해 줘. 중요도는 다른 분야·조건과의 상대적 비중이야.</p>
+              <label class="check"><input id="stop-mandatory" type="checkbox">정류장은 위 최대 거리 이내여야 해</label>
+            </fieldset>
+            <button id="apply-transport" type="submit">교통 조건 적용</button>
+          </fieldset></form>
+        </details>
         <details open><summary>나의 중요도</summary><div id="weights"></div><p class="hint">분야 비중 × 분야 안 조건 비중으로 반영해. 0은 평가에서 제외하며 필수조건은 계속 확인해.</p><button id="reweight" type="button">중요도 확정하고 다시 계산</button></details>
       </section>
     </div>
@@ -29,7 +45,7 @@
       <section class="panel map-panel"><div class="section-heading"><h2><span class="step">02</span> 비교할 위치</h2><button id="demo" class="subtle" type="button">예시 위치 3곳</button></div>
         <p class="hint">진주에서 2~6곳을 골라 줘. 예시 위치는 사용법을 위한 좌표이며 주택 추천이 아니야.</p>
         <div id="map" role="region" aria-label="후보 위치 지도"><div id="map-message">지도를 불러오는 중이야. 좌표로도 후보를 추가할 수 있어.</div></div>
-        <div class="map-toolbar"><button id="map-add" type="button" aria-pressed="false" disabled>지도에서 후보 추가</button><span>숫자: 후보 · 점: 조회한 시설</span></div>
+        <div class="map-toolbar"><button id="map-add" type="button" aria-pressed="false" disabled>지도에서 후보 추가</button><span>숫자: 후보 · 갈색 원: 상가 · 파란 사각: 정류장</span></div>
         <form id="candidate-form"><fieldset id="candidate-fields"><div class="coordinate-form"><label>이름<input id="candidate-name" maxlength="40" placeholder="후보 이름" required></label><label>위도<input id="latitude" type="number" step="any" min="-90" max="90" placeholder="35.18" required></label><label>경도<input id="longitude" type="number" step="any" min="-180" max="180" placeholder="128.10" required></label><button type="submit">추가</button></div></fieldset></form>
         <ol id="candidates" class="candidate-list"></ol><button id="compare" class="primary wide" type="button" disabled>내 기준으로 비교하기</button>
       </section>
@@ -42,7 +58,7 @@
         <div class="review-actions"><button id="reviews-search" type="button">선택한 매장 후기 조사</button><button id="reviews-cancel" type="button" hidden>조사 취소</button></div>
         <p id="reviews-status" class="hint" role="status" aria-live="polite"></p>
       </section>
-      <section class="source-note"><h2>이번 비교에서 알 수 있는 것</h2><p id="data-note"></p><p>자료에 등록된 시설까지의 <strong>직선거리</strong>를 계산해. 실제 도보 시간, 신선식품 재고, 현재 영업 여부는 추가 확인이 필요해. 병원·교통 등 다른 조건은 보존하지만 이번 모듈에서는 미확인으로 남겨 둬.</p><a href="https://www.data.go.kr/data/15083033/fileData.do" target="_blank" rel="noopener noreferrer">소상공인시장진흥공단 상가(상권)정보 원본</a></section>
+      <section class="source-note"><h2>이번 비교에서 알 수 있는 것</h2><p id="data-note"></p><p id="transport-data-note"></p><p>자료에 등록된 시설·정류장까지의 <strong>직선거리</strong>를 계산해. 실제 보행 경로·시간, 버스 노선·방향·배차·현재 운행, 신선식품 재고는 미확인이야. 병원·통근시간 등 다른 조건은 니즈로 보존하고 확인되지 않은 비중을 표시해.</p><a href="https://www.data.go.kr/data/15083033/fileData.do" target="_blank" rel="noopener noreferrer">상가(상권)정보 원본</a> · <a href="https://www.data.go.kr/data/15067528/fileData.do" target="_blank" rel="noopener noreferrer">전국 버스정류장 위치정보 원본</a></section>
     </div>
   </div>
 </main><footer>살자리 · 진주 생활권 비교 시제품<span>입력은 서버 메모리에만 보관돼. 1시간 미사용 시 연결이 만료돼.</span></footer>

@@ -15,6 +15,15 @@ module_id는 해당 분야 또는 extension이다. 기타 니즈를 누락시키
 현재 생활 모듈의 거리 지표는 grocery_straight_line_distance_m(슈퍼마켓 업종, 편의점 제외),
 convenience_straight_line_distance_m(편의점 업종)이다. 단위 m, utility는 lower다.
 둘은 직선거리만 지원한다. 도보 분/도보 거리를 직선거리로 바꾸지 마라.
+현재 교통 모듈 지표는 bus_stop_straight_line_distance_m(등록 정류장까지 직선거리)이다.
+module_id=transport, group_id=transport, 단위 m, utility는 lower다. 같은 정류장 조건을 중복 생성하지 마라.
+이동수단, 출퇴근/자주 가는 목적지, 이용 시간대는 context의 travel_mode, travel_destination,
+travel_time에 명시된 만큼 보존하라. 목적지 좌표·통근시간·노선·배차·운행 여부를 만들지 마라.
+버스 접근성이 필요하다고 한 경우만 정류장 조건을 추가하라. 차가 없다는 사실만으로 버스
+선호를 확정하지 말고 수단이 불명확하면 질문하라. 자차 중심이라고 버스 조건을 자동 삭제하거나
+교통 전체 중요도를 0으로 바꾸지 마라. 사용자가 정류장 평가를 원하지 않으면 해당 중요도만 0으로 둬라.
+정류장까지 도보 시간/경로 요구, 목적지까지 이동시간 요구는 별도 미지원 지표로 보존하라.
+직선거리 목표/만족도 0 기준이 없으면 utility=null로 두고 직선거리 기준을 질문하라.
 장보기 대상이 불명확하면 마트인지 편의점인지 질문하라. 신선식품 재고·영업시간·의료 요구는
 별도의 조건으로 남겨라. 지원하지 않는 요구도 보존하고 자료가 없다고 지어내지 마라.
 criteria와 context의 source_quote는 요청 또는 인터뷰 답변에서 그대로 복사한 연속된 짧은

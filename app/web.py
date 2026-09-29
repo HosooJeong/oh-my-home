@@ -1,4 +1,4 @@
-"""Local M1 application. Bounded, in-memory sessions; no personal-input files."""
+"""Local category comparison. Bounded, in-memory sessions; no personal-input files."""
 import argparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import ipaddress
@@ -17,6 +17,8 @@ from .contracts import Candidate, Contract, InterviewTurn, NeedProfile, Weight, 
 from .intake import prepare_profile
 from .reviews import ReviewInput, map_links, research_reviews
 from .modules.living import LivingModule, ShopIndex
+from .modules.transport import StopIndex, TransportModule
+from .transport_preferences import TransportInput, transport_profile
 from .orchestrator import Orchestrator
 from .preferences import reevaluate_preferences, update_preferences
 from tools.preview.server import sdk_key
@@ -74,9 +76,10 @@ def quick_profile(data: QuickInput):
 
 
 class AppState:
-    def __init__(self, index, runner_factory=CodexRunner):
+    def __init__(self, index, runner_factory=CodexRunner, stop_index=None):
         self.index, self.runner_factory = index, runner_factory
-        self.orchestrator = Orchestrator({"living": LivingModule(index)})
+        self.stop_index = stop_index if stop_index is not None else StopIndex({"generated_at": "unavailable", "records": []})
+        self.orchestrator = Orchestrator({"living": LivingModule(index), "transport": TransportModule(self.stop_index)})
         self.lock, self.sessions = Lock(), {}
         self.active_job = None
 
@@ -108,7 +111,7 @@ class AppState:
             current = session["comparison"]
             if current is None or current[2]["run_id"] != data.run_id:
                 raise ValueError("stale_comparison")
-            available = self.enrich(current[2])["facilities"]
+            available = {id: f for id, f in self.enrich(current[2])["facilities"].items() if f["kind"] == "shops"}
             if any(id not in available for id in data.facility_ids):
                 raise ValueError("unknown_facility")
             previous = session["review_job"]
@@ -171,8 +174,10 @@ class AppState:
 
     def enrich(self, run):
         ids = {e["source_record"] for m in run["modules"] for e in m["evidence"] if e["source_record"]}
-        return {**run, "facilities": {id: {**self.index.records[id], "review_links": map_links(self.index.records[id])}
-                                     for id in ids if id in self.index.records}}
+        facilities = {id: {**self.index.records[id], "review_links": map_links(self.index.records[id])}
+                      for id in ids if id in self.index.records}
+        facilities.update({id: self.stop_index.records[id] for id in ids if id in self.stop_index.records})
+        return {**run, "facilities": facilities}
 
     def compare(self, session, data):
         with session["lock"]:
@@ -243,6 +248,7 @@ def make_handler(state, env_path):
                 files = {"/": (STATIC / "index.html", "text/html; charset=utf-8"),
                          "/app.js": (STATIC / "app.js", "text/javascript; charset=utf-8"),
                          "/reviews.js": (STATIC / "reviews.js", "text/javascript; charset=utf-8"),
+                         "/transport.js": (STATIC / "transport.js", "text/javascript; charset=utf-8"),
                          "/style.css": (STATIC / "style.css", "text/css; charset=utf-8"),
                          "/preview/app.js": (ROOT / "tools/preview/app.js", "text/javascript; charset=utf-8"),
                          "/preview/style.css": (ROOT / "tools/preview/style.css", "text/css; charset=utf-8")}
@@ -259,7 +265,7 @@ def make_handler(state, env_path):
                     return self.send(200, {"javascriptKey": sdk_key(env_path)})
                 if path == "/api/bootstrap":
                     token, _ = state.session()
-                    return self.send(200, {"token": token, "data": state.index.metadata()})
+                    return self.send(200, {"token": token, "data": {**state.index.metadata(), "transport": state.stop_index.metadata()}})
                 if path.startswith("/api/jobs/"):
                     _, session = state.session(self.headers.get("X-Session", ""))
                     with state.lock:
@@ -286,6 +292,8 @@ def make_handler(state, env_path):
                 path = urlsplit(self.path).path
                 if path == "/api/quick":
                     return self.send(200, {"profile": quick_profile(QuickInput.model_validate(data)).model_dump()})
+                if path == "/api/transport-profile":
+                    return self.send(200, {"profile": transport_profile(TransportInput.model_validate(data)).model_dump()})
                 if path == "/api/intake":
                     return self.send(202, state.intake(session, IntakeInput.model_validate(data)))
                 if path == "/api/reviews":
@@ -323,10 +331,11 @@ def main():
     parser.add_argument("--env-file", type=Path, default=ROOT / ".env")
     args = parser.parse_args()
     sdk_key(args.env_file)
-    state = AppState(ShopIndex.load(args.inventory))
+    document = json.loads(args.inventory.read_text(encoding="utf-8"))
+    state = AppState(ShopIndex(document), stop_index=StopIndex(document))
     server = ThreadingHTTPServer((args.host, args.port), make_handler(state, args.env_file))
     server.daemon_threads = True
-    print(f"Saljari M1: http://localhost:{args.port} (bind {args.host})", flush=True)
+    print(f"Saljari M1/M2: http://localhost:{args.port} (bind {args.host})", flush=True)
     server.serve_forever()
 
 
