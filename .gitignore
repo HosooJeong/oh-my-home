@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+data/raw/
+data/processed/
+__pycache__/
+*.pyc
+*.log
+.playwright-mcp/

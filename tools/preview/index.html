@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>살자리 · 진주 데이터 표본</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+<header><div class="brand">살자리</div><div><h1>진주 데이터 표본</h1><p>상가·버스정류장·CCTV의 위치와 출처를 확인해.</p></div><span class="preview-label">개발 표본</span></header>
+<main>
+<section class="toolbar" aria-label="지도 표시 설정">
+<label class="area-label">살펴볼 곳<select id="area" disabled></select></label>
+<fieldset><legend>표시할 자료</legend>
+<label><input type="checkbox" name="kind" value="shops" checked><span class="dot shops"></span>상가</label>
+<label><input type="checkbox" name="kind" value="bus" checked><span class="dot bus"></span>정류장</label>
+<label><input type="checkbox" name="kind" value="cctv" checked><span class="dot cctv"></span>CCTV</label>
+</fieldset>
+<button id="reset" class="secondary" disabled>표본 전체 보기</button>
+</section>
+<p id="status" role="status">자료를 불러오는 중</p>
+<div class="workspace">
+<section class="map-section" aria-label="지도와 선택한 자료">
+<div id="map" aria-label="카카오 지도 위 공공데이터 표본"></div>
+<div id="detail" class="detail"><p>목록이나 지도에서 표본을 선택해.</p></div>
+</section>
+<aside><div class="list-title"><h2>지도 표본</h2><span id="count"></span></div>
+<p class="muted">기준 상가 주변의 자료를 종류별 3개씩 골랐어. 추천 순위는 아니야.</p>
+<div id="items"></div></aside>
+</div>
+<details class="quality"><summary>원본 점검과 자료 시점</summary>
+<div class="table-wrap"><table><thead><tr><th>자료</th><th>진주 원본 행</th><th>좌표 범위 통과</th><th>별도 보관</th><th>자료 시점</th></tr></thead><tbody id="quality"></tbody></table></div>
+<p>진주 주변의 넓은 좌표 범위를 벗어난 행은 수정하지 않고 별도 보관했어. 범위 통과가 정확한 위치나 행정경계 안임을 보장하진 않아.</p>
+<p>CCTV 반복 행은 원본에 보존했고, 지도 표본에서만 같은 좌표의 겹침을 피했어. 카메라 작동·상가 현재 영업·버스 현재 운행은 확인하지 않았어.</p>
+<div id="sources"></div>
+</details>
+</main>
+<script src="/app.js"></script>
+</body></html>
