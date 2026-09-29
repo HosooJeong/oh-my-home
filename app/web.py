@@ -15,6 +15,7 @@ from pydantic import Field
 from .codex_runner import CodexRunner, RunnerError
 from .contracts import Candidate, Contract, InterviewTurn, NeedProfile, Weight, digest
 from .intake import prepare_profile
+from .reviews import ReviewInput, map_links, research_reviews
 from .modules.living import LivingModule, ShopIndex
 from .orchestrator import Orchestrator
 from .preferences import reevaluate_preferences, update_preferences
@@ -89,7 +90,8 @@ class AppState:
                 if len(self.sessions) >= 64:
                     raise RuntimeError("busy")
                 token = secrets.token_urlsafe(32)
-                self.sessions[token] = {"touched": now, "jobs": {}, "comparison": None, "lock": Lock()}
+                self.sessions[token] = {"touched": now, "jobs": {}, "comparison": None,
+                                        "review_job": None, "review_key": None, "lock": Lock()}
             if token not in self.sessions:
                 raise PermissionError("session_expired")
             result = self.sessions[token]
@@ -97,50 +99,90 @@ class AppState:
             return token, result
 
     def intake(self, session, data):
+        return self.start_job(session, data, "intake",
+            lambda runner, cancel: prepare_profile(runner, data.request, data.answers, data.previous,
+                                                    cancel=cancel).model_dump())
+
+    def reviews(self, session, data):
+        with session["lock"]:
+            current = session["comparison"]
+            if current is None or current[2]["run_id"] != data.run_id:
+                raise ValueError("stale_comparison")
+            available = self.enrich(current[2])["facilities"]
+            if any(id not in available for id in data.facility_ids):
+                raise ValueError("unknown_facility")
+            previous = session["review_job"]
+            if previous:
+                if previous["fingerprint"] != digest({"kind": "reviews", **data.model_dump()}):
+                    raise ValueError("research_already_requested")
+                return self.public_job(previous)
+            shops = [available[id] for id in data.facility_ids]
+            return self.start_job(session, data, "reviews",
+                lambda runner, cancel: research_reviews(runner, shops, cancel=cancel),
+                review_key=session["review_key"])
+
+    def start_job(self, session, data, kind, execute, review_key=None):
+        fingerprint = digest({"kind": kind, **data.model_dump()})
         with self.lock:
             old = session["jobs"].get(data.request_id)
             if old:
-                if old["fingerprint"] != digest(data.model_dump()):
+                if old["fingerprint"] != fingerprint:
                     raise ValueError("request_id_conflict")
                 return self.public_job(old)
             if self.active_job:
                 raise RuntimeError("busy")
             if len(session["jobs"]) >= 20:
                 del session["jobs"][next(iter(session["jobs"]))]
-            job = {"id": data.request_id, "status": "running", "profile": None, "error": None,
-                   "cancel": Event(), "fingerprint": digest(data.model_dump()), "metadata": None}
+            job = {"id": data.request_id, "kind": kind, "status": "running", "profile": None,
+                   "result": None, "error": None, "cancel": Event(),
+                   "fingerprint": fingerprint, "metadata": None}
             session["jobs"][data.request_id] = job
+            if kind == "reviews":
+                session["review_job"] = job
             self.active_job = job
         def work():
+            runner = None
             try:
                 runner = self.runner_factory()
-                profile = prepare_profile(runner, data.request, data.answers, data.previous, cancel=job["cancel"])
-                with self.lock:
-                    if not job["cancel"].is_set():
-                        job.update(profile=profile.model_dump(), status="completed", metadata=runner.last_metadata)
-                    else:
+                result = execute(runner, job["cancel"])
+                with session["lock"], self.lock:
+                    job["metadata"] = runner.last_metadata
+                    if job["cancel"].is_set():
                         job["status"] = "cancelled"
+                    elif kind == "reviews" and session["review_key"] != review_key:
+                        job.update(status="stale", error="stale_comparison")
+                    else:
+                        job.update({"profile" if kind == "intake" else "result": result,
+                                    "status": "completed"})
             except Exception as error:
                 with self.lock:
-                    code = error.code if isinstance(error, RunnerError) else "intake_failed"
+                    code = error.code if isinstance(error, RunnerError) else kind + "_failed"
                     job.update(status="cancelled" if job["cancel"].is_set() else "failed", error=code)
             finally:
                 with self.lock:
+                    job["metadata"] = runner.last_metadata if runner else None
                     self.active_job = None
         Thread(target=work, daemon=True).start()
         return self.public_job(job)
 
     @staticmethod
     def public_job(job):
-        return {k: job[k] for k in ("id", "status", "profile", "error", "metadata")}
+        return {k: job[k] for k in ("id", "kind", "status", "profile", "result", "error", "metadata")}
 
     def enrich(self, run):
         ids = {e["source_record"] for m in run["modules"] for e in m["evidence"] if e["source_record"]}
-        return {**run, "facilities": {id: self.index.records[id] for id in ids if id in self.index.records}}
+        return {**run, "facilities": {id: {**self.index.records[id], "review_links": map_links(self.index.records[id])}
+                                     for id in ids if id in self.index.records}}
 
     def compare(self, session, data):
         with session["lock"]:
             run = self.orchestrator.run(data.profile, data.candidates)
+            previous_job = session["review_job"]
+            if previous_job and previous_job["status"] == "running":
+                previous_job["cancel"].set()
+            session["review_job"] = None
+            session["review_key"] = run["run_id"]
+            run["review_key"] = run["run_id"]
             session["comparison"] = (data.profile, data.candidates, run)
             return self.enrich(run)
 
@@ -200,6 +242,7 @@ def make_handler(state, env_path):
                 path = urlsplit(self.path).path
                 files = {"/": (STATIC / "index.html", "text/html; charset=utf-8"),
                          "/app.js": (STATIC / "app.js", "text/javascript; charset=utf-8"),
+                         "/reviews.js": (STATIC / "reviews.js", "text/javascript; charset=utf-8"),
                          "/style.css": (STATIC / "style.css", "text/css; charset=utf-8"),
                          "/preview/app.js": (ROOT / "tools/preview/app.js", "text/javascript; charset=utf-8"),
                          "/preview/style.css": (ROOT / "tools/preview/style.css", "text/css; charset=utf-8")}
@@ -245,6 +288,8 @@ def make_handler(state, env_path):
                     return self.send(200, {"profile": quick_profile(QuickInput.model_validate(data)).model_dump()})
                 if path == "/api/intake":
                     return self.send(202, state.intake(session, IntakeInput.model_validate(data)))
+                if path == "/api/reviews":
+                    return self.send(202, state.reviews(session, ReviewInput.model_validate(data)))
                 if path.startswith("/api/jobs/") and path.endswith("/cancel"):
                     id = path[len("/api/jobs/"):-len("/cancel")]
                     with state.lock:

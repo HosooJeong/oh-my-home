@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ko">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>살자리 · 나에게 맞는 동네 찾기</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>살자리 · 나에게 맞는 동네 찾기</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script><script src="/reviews.js" defer></script></head>
 <body>
 <header><a class="brand" href="/">살자리<span>나에게 맞는 동네 찾기</span></a><a class="quiet-link" href="/samples">자료 지도 보기</a></header>
 <main>
@@ -34,6 +34,14 @@
         <ol id="candidates" class="candidate-list"></ol><button id="compare" class="primary wide" type="button" disabled>내 기준으로 비교하기</button>
       </section>
       <section id="results" class="panel" hidden><div class="section-heading"><h2><span class="step">03</span> 내 조건과의 적합도</h2><span id="result-tag" class="tag"></span></div><p id="result-summary"></p><div id="result-cards" class="result-grid"></div><p class="hint">적합도는 네가 정한 거리 기준에 선형으로 반영한 값이야. 주거지의 객관적인 품질이나 추천 확률을 뜻하지 않아.</p></section>
+      <section id="reviews-panel" class="panel" hidden>
+        <h2><span class="step">04</span> 사람들은 어떻게 느꼈을까?</h2>
+        <p>규모와 품목, 만족하거나 아쉬웠던 경험을 공개 후기에서 찾아볼게.</p>
+        <p class="hint">현재 티스토리의 공개 방문 후기를 조사해. 짧은 인용과 AI 요약을 구분하며, 지점과 작성 시점은 원문에서 함께 확인해 줘. 일부 후기는 대표 평판이 아니야.</p>
+        <div id="review-facilities" class="review-grid"></div>
+        <div class="review-actions"><button id="reviews-search" type="button">선택한 매장 후기 조사</button><button id="reviews-cancel" type="button" hidden>조사 취소</button></div>
+        <p id="reviews-status" class="hint" role="status" aria-live="polite"></p>
+      </section>
       <section class="source-note"><h2>이번 비교에서 알 수 있는 것</h2><p id="data-note"></p><p>자료에 등록된 시설까지의 <strong>직선거리</strong>를 계산해. 실제 도보 시간, 신선식품 재고, 현재 영업 여부는 추가 확인이 필요해. 병원·교통 등 다른 조건은 보존하지만 이번 모듈에서는 미확인으로 남겨 둬.</p><a href="https://www.data.go.kr/data/15083033/fileData.do" target="_blank" rel="noopener noreferrer">소상공인시장진흥공단 상가(상권)정보 원본</a></section>
     </div>
   </div>
