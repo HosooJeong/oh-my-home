@@ -62,12 +62,14 @@ function renderReviews() {
   updateReviewControls();
 }
 async function startReviews(existingJob=null) {
-  if (state.busy || reviewState.requested || !state.run || !reviewState.selected.size) return;
+  if (state.busy || reviewState.requested || !state.run || !existingJob && !reviewState.selected.size) return;
   const key = reviewState.key;
   const id = existingJob?.id || globalThis.crypto?.randomUUID?.() || `r${Date.now()}_${Math.random().toString(36).slice(2)}`;
   reviewState.job = id; reviewState.accepted = false; reviewState.cancelled = false;
   reviewState.requested = true; busy(true); $('reviews-cancel').hidden = false;
-  $('reviews-status').textContent = '후기를 검색하고 짧은 인용을 원문과 대조하고 있어. 최대 3분 정도 걸릴 수 있어.';
+  $('reviews-status').textContent = '필요한 웹자료를 검색하고 원문·작성일·대상을 대조하고 있어. 최대 3분 정도 걸릴 수 있어.';
+  if(typeof setSafetyStatus==='function')setSafetyStatus($('reviews-status').textContent);
+  if(typeof updateSafetyControls==='function')updateSafetyControls();
   try {
     let job = existingJob || await api('/api/reviews', {request_id:id, run_id:state.run.run_id, facility_ids:[...reviewState.selected]});
     reviewState.accepted = true;
@@ -76,11 +78,13 @@ async function startReviews(existingJob=null) {
     if (key !== reviewState.key) return;
     if (reviewState.cancelled || job.status === 'cancelled') $('reviews-status').textContent = '후기 조사를 취소했어.';
     else if (job.status === 'completed') {
-      reviewState.result = job.result; renderReviews();
-      $('reviews-status').textContent = '최신 웹 보완 조사가 끝났어. 일부 작성자의 경험이며, 전체 평판이나 현재 상태를 보장하지 않아. 거리 점수에는 반영하지 않았어.';
+      reviewState.result = job.result; renderReviews();if(typeof renderSafety==='function')renderSafety();
+      $('reviews-status').textContent = job.result.errors?.length ? '일부 웹 보완 조사를 완료하지 못했어. 확인된 출처만 참고하고 나머지는 미확인으로 남겼어.'
+        : job.result.safety && !job.result.items.length ? '이번에는 안전·환경의 공식 지역자료를 보완했어. 상가 후기는 조사하지 않았어.'
+        : '최신 웹 보완 조사가 끝났어. 일부 작성자의 경험이며, 전체 평판이나 현재 상태를 보장하지 않아. 거리 점수에는 반영하지 않았어.';
     } else $('reviews-status').textContent = messages[job.error] || '후기 조사를 완료하지 못했어. 지도 링크에서 직접 살펴볼 수 있어.';
   } catch(error) { $('reviews-status').textContent = error.message; }
-  finally { reviewState.job=null; busy(false); $('reviews-cancel').hidden=true;
+  finally { if(!reviewState.result?.safety&&typeof setSafetyStatus==='function')setSafetyStatus($('reviews-status').textContent);reviewState.job=null; busy(false); $('reviews-cancel').hidden=true;
     if (key===reviewState.key) $('reviews-status').textContent += ' 다시 조사하려면 위치 비교를 새로 실행해 줘.'; }
 }
 $('reviews-search').addEventListener('click', () => startReviews());

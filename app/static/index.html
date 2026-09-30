@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ko">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>살자리 · 나에게 맞는 동네 찾기</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script><script src="/transport.js" defer></script><script src="/reviews.js" defer></script><script src="/candidates.js" defer></script><script src="/housing.js" defer></script><script src="/education.js" defer></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>살자리 · 나에게 맞는 동네 찾기</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script><script src="/transport.js" defer></script><script src="/reviews.js" defer></script><script src="/candidates.js" defer></script><script src="/housing.js" defer></script><script src="/education.js" defer></script><script src="/safety.js" defer></script></head>
 <body>
 <header><a class="brand" href="/">살자리<span>나에게 맞는 동네 찾기</span></a><a class="quiet-link" href="/samples">자료 지도 보기</a></header>
 <main>
@@ -35,6 +35,21 @@
           <p class="hint">숫자는 편집용 제안값이야. 적용할 때 네 기준으로 확인해 줘. 가까운 학교가 배정 학교는 아니야. 통학로·횡단·안전은 아직 미확인이야.</p>
           <label class="check"><input id="education-research" type="checkbox">학원 수업 형태·규모·일부 경험도 최신 웹자료로 보완</label>
           <button type="submit">교육 조건 적용</button>
+        </fieldset></form>
+      </section>
+      <section class="panel"><h2>안전·환경 조건</h2><p id="safety-data-note" class="hint"></p>
+        <form id="safety-form"><fieldset id="safety-fields">
+          <p>어떤 문제가 중요해?</p>
+          <label class="check"><input name="safety-topic" value="night" type="checkbox">야간 보행 안전</label>
+          <label class="check"><input name="safety-topic" value="traffic" type="checkbox">보행·교통사고</label>
+          <label class="check"><input name="safety-topic" value="flood" type="checkbox">침수·재해</label>
+          <label class="check"><input name="safety-topic" value="noise" type="checkbox">소음</label>
+          <label class="check"><input name="safety-topic" value="air" type="checkbox">대기환경</label>
+          <div class="pair"><label>안전·환경 분야 중요도<input id="safety-weight" type="number" min="0" max="100" value="30" required></label><label>선택한 각 조건 중요도<input id="safety-importance" type="number" min="0" max="100" value="100" required></label></div>
+          <label>CCTV 참고 직선반경 (m)<input id="safety-radius" type="number" min="1" max="5000" value="500" required></label>
+          <p class="hint">숫자는 적용 전 제안값이야. CCTV 등록 지점은 참고이며 안전 점수가 아니야. 문제별 근거가 부족하면 중요도를 유지하고 전체 순위를 보류해. 서로 다른 조건의 중요도는 아래에서 따로 바꿀 수 있어.</p>
+          <label class="check"><input id="safety-research" type="checkbox">후보 지역의 최신 공식 웹자료로 선택한 문제 보완</label>
+          <button type="submit">안전·환경 조건 적용</button>
         </fieldset></form>
       </section>
       <section id="profile-panel" class="panel" hidden><h2>정리한 니즈</h2><div id="context"></div><div id="criteria"></div><form id="interview"><div id="questions"></div><button id="answer" type="submit" hidden>답변 반영</button></form>
@@ -75,6 +90,11 @@
         <ol id="candidates" class="candidate-list"></ol><button id="compare" class="primary wide" type="button" disabled>내 기준으로 비교하기</button>
       </section>
       <section id="results" class="panel" hidden><div class="section-heading"><h2><span class="step">03</span> 내 조건과의 적합도</h2><span id="result-tag" class="tag"></span></div><p id="result-summary"></p><div id="result-cards" class="result-grid"></div><p class="hint">적합도는 네가 정한 거리 기준에 선형으로 반영한 값이야. 주거지의 객관적인 품질이나 추천 확률을 뜻하지 않아.</p></section>
+      <section id="safety-panel" class="panel" hidden><h2>안전·환경 · 등록 자료와 지역 근거</h2>
+        <p>CCTV 등록 정보와 공식 게시글을 참고해. 안전도·재해 확률·집 안 소음이나 공기질을 확정하는 자료는 아니야.</p>
+        <div id="safety-reference"></div><div id="safety-research-result"></div>
+        <p id="safety-status" class="hint" role="status" aria-live="polite"></p><button id="safety-cancel" type="button" hidden>보완 조사 취소</button>
+      </section>
       <section id="housing-panel" class="panel">
         <h2>집·비용 · 과거 거래 참고</h2>
         <p class="hint">집마다 가격 편차가 커서 이번 가격 자료는 적합도와 지점 선별에 반영하지 않아. 실제 매물을 추천하거나 예산 충족 여부를 판단하지 않아.</p>

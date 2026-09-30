@@ -259,6 +259,59 @@ class ReferenceResult(Contract):
         return self
 
 
+class CctvObservation(Contract):
+    candidate_id: Identifier
+    status: Literal['available', 'stale', 'unavailable', 'outside_scope']
+    registered_rows_within_radius: Annotated[int, Field(ge=0)] | None
+    registered_coordinate_points_within_radius: Annotated[int, Field(ge=0)] | None
+    nearest_distance_m: Annotated[float, Field(ge=0, allow_inf_nan=False)] | None
+    nearest_source_records: list[Text]
+    purposes_within_radius: list[Text]
+    area_code: str | None
+    area_name: str | None
+
+    @model_validator(mode='after')
+    def measured(self):
+        rows, points = self.registered_rows_within_radius, self.registered_coordinate_points_within_radius
+        if self.status in ('available', 'stale'):
+            if rows is None or points is None or points > rows or self.nearest_distance_m is None or not self.nearest_source_records:
+                raise ValueError('invalid CCTV observation')
+        elif any(v is not None for v in (rows, points, self.nearest_distance_m)) or self.nearest_source_records:
+            raise ValueError('unavailable CCTV observation has measurements')
+        return self
+
+
+class SafetyReferenceResult(Contract):
+    """Registered CCTV snapshot, separated from crime/risk/safety score evidence."""
+    module_id: Literal['safety']
+    module_version: Text
+    profile_fingerprint: str
+    candidates_fingerprint: str
+    status: Literal['available', 'partial', 'unavailable']
+    radius_m: Annotated[float, Field(gt=0, le=5000, allow_inf_nan=False)]
+    source_url: SourceURL
+    publication_date: str | None
+    retrieved_at: str | None
+    snapshot_fingerprint: str | None
+    excluded_coordinate_rows: Annotated[int, Field(ge=0)] | None
+    observations: list[CctvObservation]
+    limitations: list[Text]
+    score_eligible: Literal[False] = False
+
+    @model_validator(mode='after')
+    def traceable(self):
+        if len({o.candidate_id for o in self.observations}) != len(self.observations):
+            raise ValueError('duplicate reference candidate')
+        if any(o.status in ('available', 'stale') for o in self.observations) and not all(
+                (self.publication_date, self.retrieved_at, self.snapshot_fingerprint)):
+            raise ValueError('reference provenance missing')
+        if self.status == 'available' and (not self.observations or any(o.status != 'available' for o in self.observations)):
+            raise ValueError('incomplete safety reference')
+        if self.status == 'unavailable' and any(o.status in ('available', 'stale') for o in self.observations):
+            raise ValueError('unavailable reference has data')
+        return self
+
+
 def digest(value) -> str:
     return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True,
                                     separators=(",", ":"), allow_nan=False).encode()).hexdigest()

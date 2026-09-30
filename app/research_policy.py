@@ -79,7 +79,8 @@ def prompt_rules():
 '''
 
 
-def admissible(excerpt, page, facility):
+def admissible_excerpt(excerpt, page):
+    """Shared date and verbatim-source checks before a domain-specific identity check."""
     if not excerpt.published_date:
         return 'date_unknown'
     try:
@@ -92,6 +93,12 @@ def admissible(excerpt, page, facility):
         return 'publication_unverified'
     if normalize(excerpt.quote) not in page.text:
         return 'quote_unverified'
+    return None
+
+
+def admissible(excerpt, page, facility):
+    reason = admissible_excerpt(excerpt, page)
+    if reason: return reason
     compact = re.sub(r'\s+', '', page.text)
     if re.sub(r'\s+', '', facility['name']) not in compact:
         return 'identity_unverified'

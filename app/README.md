@@ -77,3 +77,7 @@ Windows에서는 npm `codex.cmd` 패키지의 네이티브 실행 파일을 우�
 - [Pydantic JSON Schema](https://docs.pydantic.dev/latest/concepts/json_schema/), [엄격한 검증](https://docs.pydantic.dev/latest/concepts/strict_mode/)
 
 2026-09-30 문서와 로컬 설치본을 확인했다. 새 CLI로 변경할 때는 옵션·스키마·검색 진단을 다시 검증한다.
+
+## M5 안전·환경 개발본
+
+[안전·환경 범위](../docs/safety-environment.md): 기존 CCTV 등록 참고와 문제별 니즈/개인 중요도·미확인 비중, 요청한 공식 지역 LLM 직접 검색/원문·작성일 대조를 메인에 연결했다. CCTV/짧은 공식 인용은 안전도 점수가 아니며 현재 위험 정량 지표는 미지원이다. 서버는 0.0.0.0:5173, 기존 원본/경계/후보 pool을 사용한다. 전체6분야 E2E/실사용자 검증과 구분한다.

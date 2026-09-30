@@ -22,6 +22,9 @@ from .modules.transport import StopIndex, TransportModule
 from .modules.housing import HousingIndex, HousingModule, HousingQuery
 from .modules.education import EducationIndex, EducationModule
 from .education_preferences import EducationInput, education_profile
+from .modules.safety import CctvIndex, SafetyModule, context_value
+from .safety_preferences import SafetyInput, safety_profile
+from .safety_research import research_safety
 from .geo import distance_m
 from .transport_preferences import TransportInput, transport_profile
 from .orchestrator import Orchestrator
@@ -49,6 +52,11 @@ class PreferenceInput(Contract):
     group_weights: dict[str, Weight]
     criterion_importance: dict[str, Weight]
     confirm_weights: bool
+
+
+class SupplementInput(Contract):
+    request_id: Annotated[str, Field(pattern=r'^[a-zA-Z0-9_-]{1,80}$')]
+    run_id: str
 
 
 class QuickInput(Contract):
@@ -81,14 +89,17 @@ def quick_profile(data: QuickInput):
 
 
 class AppState:
-    def __init__(self, index, runner_factory=CodexRunner, stop_index=None, candidate_pool=None, housing_index=None, education_index=None):
+    def __init__(self, index, runner_factory=CodexRunner, stop_index=None, candidate_pool=None, housing_index=None, education_index=None, safety_index=None):
         self.index, self.runner_factory = index, runner_factory
         self.candidate_pool = candidate_pool
         self.stop_index = stop_index if stop_index is not None else StopIndex({"generated_at": "unavailable", "records": []})
         self.housing = HousingModule(housing_index if housing_index is not None else HousingIndex())
         self.education_index = education_index if education_index is not None else EducationIndex()
+        self.safety_index = safety_index if safety_index is not None else CctvIndex()
+        self.safety = SafetyModule(self.safety_index)
         self.orchestrator = Orchestrator({"living": LivingModule(index), "transport": TransportModule(self.stop_index),
-                                        "housing": self.housing, 'education': EducationModule(self.education_index)}, reference_modules={"housing": self.housing})
+                                        "housing": self.housing, 'education': EducationModule(self.education_index),
+                                        'safety':self.safety}, reference_modules={"housing": self.housing, 'safety':self.safety})
         self.lock, self.sessions = Lock(), {}
         self.active_job = None
 
@@ -149,7 +160,7 @@ class AppState:
                    "result": None, "error": None, "cancel": Event(),
                    "fingerprint": fingerprint, "metadata": None}
             session["jobs"][data.request_id] = job
-            if kind == "reviews":
+            if kind in ('reviews', 'supplement'):
                 session["review_job"] = job
             self.active_job = job
         def work():
@@ -161,7 +172,7 @@ class AppState:
                     job["metadata"] = runner.last_metadata
                     if job["cancel"].is_set():
                         job["status"] = "cancelled"
-                    elif kind == "reviews" and session["review_key"] != review_key:
+                    elif kind in ('reviews', 'supplement') and session["review_key"] != review_key:
                         job.update(status="stale", error="stale_comparison")
                     else:
                         job.update({"profile" if kind == "intake" else "result": result,
@@ -202,6 +213,30 @@ class AppState:
                 facilities[id] = {**row, 'review_links': map_links(row)}
         return {**run, "facilities": facilities, 'education_details': details}
 
+    def supplement(self, session, run_id, facilities, targets):
+        """One cancellable, comparison-bound task; category research executes sequentially."""
+        with session['lock']:
+            if not session['comparison'] or session['comparison'][2]['run_id'] != run_id:
+                raise ValueError('stale_comparison')
+            def execute(runner, cancel):
+                result = {'items':[], 'score_eligible':False, 'safety':None, 'steps':[], 'errors':[]}
+                for module, enabled, query in [
+                    ('facility_reviews', facilities, lambda:research_reviews(runner,facilities,cancel=cancel)),
+                    ('safety', targets, lambda:research_safety(runner,targets,cancel=cancel))]:
+                    if not enabled: continue
+                    try:
+                        value = query()
+                        if module == 'safety': result['safety'] = value
+                        else: result.update(value)
+                    except Exception as error:
+                        if cancel.is_set(): raise RunnerError('cancelled')
+                        result['errors'].append({'module':module,
+                            'code':error.code if isinstance(error,RunnerError) else 'research_failed'})
+                    result['steps'].append({'module':module, **runner.last_metadata})
+                return result
+            return self.start_job(session, SupplementInput(request_id='auto_'+secrets.token_hex(12),run_id=run_id),
+                'supplement', execute, review_key=session['review_key'])
+
     def compare(self, session, data):
         with session["lock"]:
             run = self.orchestrator.run(data.profile, data.candidates)
@@ -216,19 +251,24 @@ class AppState:
         # Conditional public-only research follows numerical modules; no search when unnecessary.
         requested = any(c.key in ('education_research', 'qualitative_research_requested') and c.value == 'requested'
                         for c in data.profile.context)
+        facilities = []
         if requested:
             kind = 'academy' if any(c.key == 'education_research' and c.value == 'requested' for c in data.profile.context) else 'shops'
             facilities = sorted((f for f in enriched['facilities'].values() if f['kind'] == kind),
                 key=lambda f:(min(distance_m(c.latitude,c.longitude,f['lat'],f['lon']) for c in data.candidates),f['id']))[:3]
-            if facilities:
-                enriched['research_facility_ids'] = [f['id'] for f in facilities]
-                try:
-                    enriched['research_job'] = self.reviews(session, ReviewInput(request_id='auto_' + secrets.token_hex(12),
-                        run_id=run['run_id'], facility_ids=[f['id'] for f in facilities]))
-                except RuntimeError:
-                    enriched['research_status'] = 'busy'
-            else:
+            if not facilities:
                 enriched['research_status'] = 'no_verified_facility'
+        targets = self.safety_index.research_targets(data.profile, data.candidates)
+        run['safety_research_scope'] = targets
+        enriched['safety_research_scope'] = targets
+        if context_value(data.profile, 'safety_research') == 'requested' and not targets:
+            enriched['safety_research_status'] = 'no_verified_area_or_topic'
+        if facilities or targets:
+            enriched['research_facility_ids'] = [f['id'] for f in facilities]
+            try:
+                enriched['research_job'] = self.supplement(session,run['run_id'], facilities, targets)
+            except RuntimeError:
+                enriched['research_status'] = 'busy'
         return enriched
 
     def preferences(self, session, data):
@@ -293,6 +333,7 @@ def make_handler(state, env_path):
                          "/transport.js": (STATIC / "transport.js", "text/javascript; charset=utf-8"),
                          "/housing.js": (STATIC / "housing.js", "text/javascript; charset=utf-8"),
                          '/education.js': (STATIC / 'education.js', 'text/javascript; charset=utf-8'),
+                         '/safety.js': (STATIC / 'safety.js', 'text/javascript; charset=utf-8'),
                          "/style.css": (STATIC / "style.css", "text/css; charset=utf-8"),
                          "/preview/app.js": (ROOT / "tools/preview/app.js", "text/javascript; charset=utf-8"),
                          "/preview/style.css": (ROOT / "tools/preview/style.css", "text/css; charset=utf-8")}
@@ -312,6 +353,7 @@ def make_handler(state, env_path):
                     return self.send(200, {"token": token, "data": {**state.index.metadata(),
                         "transport": state.stop_index.metadata(), "housing": state.housing.index.metadata(),
                         'education': state.education_index.metadata(),
+                        'safety':state.safety_index.metadata(),
                         "candidate_generation": state.candidate_pool.metadata()
                         if state.candidate_pool else {"available": False}}})
                 if path.startswith("/api/jobs/"):
@@ -344,6 +386,8 @@ def make_handler(state, env_path):
                     return self.send(200, {"profile": transport_profile(TransportInput.model_validate(data)).model_dump()})
                 if path == '/api/education-profile':
                     return self.send(200, {'profile': education_profile(EducationInput.model_validate(data)).model_dump()})
+                if path == '/api/safety-profile':
+                    return self.send(200, {'profile': safety_profile(SafetyInput.model_validate(data)).model_dump()})
                 if path == "/api/housing-reference":
                     return self.send(200, state.housing.reference(HousingQuery.model_validate(data)).model_dump())
                 if path == "/api/candidates":
@@ -391,6 +435,7 @@ def main():
     parser.add_argument("--boundary", type=Path, default=ROOT / "data/reference/jinju-boundary-2025.geojson")
     parser.add_argument("--housing", type=Path, default=ROOT / "data/processed/housing.json")
     parser.add_argument('--education', type=Path, default=ROOT / 'data/processed/education.json')
+    parser.add_argument('--quarantine', type=Path, default=ROOT / 'data/processed/quarantine.json')
     args = parser.parse_args()
     sdk_key(args.env_file)
     document = json.loads(args.inventory.read_text(encoding="utf-8"))
@@ -409,10 +454,19 @@ def main():
         education = EducationIndex.load(args.education, document)
     except (OSError, ValueError, KeyError, TypeError):
         print('Education unavailable: prepare verified school/academy snapshots.', flush=True)
-    state = AppState(ShopIndex(document), stop_index=StopIndex(document), candidate_pool=pool, housing_index=housing, education_index=education)
+    excluded = None
+    try:
+        quarantined = json.loads(args.quarantine.read_text(encoding='utf-8'))
+        if quarantined['generated_at'] == document['generated_at']:
+            excluded = sum(r['source'] == 'cctv' and r['reason'] in ('outside_broad_jinju_screen','invalid_coordinate')
+                           for r in quarantined['records'])
+    except (OSError, ValueError, KeyError, TypeError): pass
+    safety = CctvIndex(document, pool.boundary if pool else None, excluded)
+    state = AppState(ShopIndex(document), stop_index=StopIndex(document), candidate_pool=pool,
+                     housing_index=housing, education_index=education, safety_index=safety)
     server = ThreadingHTTPServer((args.host, args.port), make_handler(state, args.env_file))
     server.daemon_threads = True
-    print(f"Saljari M1/M2/M3/M4: http://localhost:{args.port} (bind {args.host})", flush=True)
+    print(f"Saljari M1/M2/M3/M4/M5: http://localhost:{args.port} (bind {args.host})", flush=True)
     server.serve_forever()
 
 

@@ -23,3 +23,7 @@ M4 `EducationModule`도 같은 `CategoryResult` 규격으로 등록했다. 학�
 `TransportModule`을 `transport`로 등록한다. `StopIndex`는 inventory의 `kind=bus` 전체 1,968행을 읽는다. `bus_stop_straight_line_distance_m` 하나를 지원하며 가장 가까운 원본 정류장까지 `lower`/`m` 근거를 반환한다. 생활·교통 모듈은 공통 `app.geo`의 좌표 검사창·Haversine 계산을 사용하고 각자 자료·ID·시점을 관리한다. 가중치와 순위는 공통 평가기에서만 계산한다.
 
 ID·좌표·출처·날짜·CSV 행을 검사한다. 자료 없음·좌표 검사창 밖은 missing, 도보/통근시간·단위/방향 불일치는 unsupported로 반환한다. 이름이 같은 정류장을 합치거나 노선/방향을 추측하지 않는다. 자료·사용자 편집·미지원 조건의 세부 경계는 [교통 범위](../../docs/transport-accessibility.md)를 따른다. 공통 후보 자동 생성은 별도 후속이다.
+
+## M5 안전·환경
+
+SafetyModule은 미지원 위험 조건을 보존하고 CctvIndex의 등록 좌표 조회를 SafetyReferenceResult로만 반환한다. 메인이 지문/후보 ID를 확인한다. 공식 지역 웹 보완은 수치 모듈 뒤 별도 취소 가능한 순차 파이프라인에서 실행되며 점수 입력이 아니다. [범위/재현](../../docs/safety-environment.md).

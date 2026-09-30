@@ -4,7 +4,7 @@ from threading import Event
 from typing import Protocol
 from uuid import uuid4
 
-from .contracts import Candidate, CategoryResult, CriterionWeight, ModuleRequest, NeedProfile, ReferenceResult, digest
+from .contracts import Candidate, CategoryResult, CriterionWeight, ModuleRequest, NeedProfile, ReferenceResult, SafetyReferenceResult, digest
 from .evaluation import evaluate, weights
 
 
@@ -81,11 +81,16 @@ class Orchestrator:
         references = []
         for module_id, module in self.reference_modules.items():
             try:
-                reference = ReferenceResult.model_validate(module.run_reference(
+                if hasattr(module, 'reference_requested') and not module.reference_requested(profile):
+                    continue
+                contract = SafetyReferenceResult if module_id == 'safety' else ReferenceResult
+                reference = contract.model_validate(module.run_reference(
                     profile.model_copy(deep=True), [c.model_copy(deep=True) for c in candidates], cancel).model_dump())
                 if (reference.module_id != module_id or reference.profile_fingerprint != identity["profile_fingerprint"]
                         or reference.candidates_fingerprint != identity["candidates_fingerprint"]):
                     raise ValueError("stale reference")
+                if module_id == 'safety' and {o.candidate_id for o in reference.observations} != {c.id for c in candidates}:
+                    raise ValueError('foreign reference candidates')
                 references.append(reference.model_dump())
                 events.append({"stage": "reference_finished", "module_id": module_id, "status": reference.status})
             except Exception:

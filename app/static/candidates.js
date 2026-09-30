@@ -3,7 +3,7 @@ state.candidateGeneration = null;
 state.candidateMetadata = null;
 function updateCandidateControls() {
   $('generation-fields').disabled = state.busy;
-  $('generate-candidates').disabled = state.busy || !state.profile || state.transportDirty || !state.candidateMetadata?.available;
+  $('generate-candidates').disabled = state.busy || !state.profile || state.transportDirty || state.educationDirty || state.safetyDirty || !state.candidateMetadata?.available;
 }
 function initCandidateGeneration(metadata) {
   state.candidateMetadata = metadata;
@@ -23,7 +23,7 @@ function clearCandidateGeneration() {
 }
 $('generation-form').addEventListener('submit', async event => {
   event.preventDefault();
-  if (state.busy || !state.profile || state.transportDirty) return;
+  if (state.busy || !state.profile || state.transportDirty || state.educationDirty || state.safetyDirty) return;
   busy(true); notice('선택한 범위의 분석 지점을 같은 생활·교통 조건으로 비교하고 있어.');
   try {
     const profile = withRules(withWeights(state.profile));

@@ -40,6 +40,17 @@ school_level, radius_m(직선반경의 숫자를 문자열로)을 명시한 만�
 education_level, education_subject, school_travel_mode는 명시된 배경을 context에 보존하라.
 학원 수업 형태·규모·후기 등 정성적 보완을 요청하면 education_research=requested를 context에 넣어라.
 그런 서술 요청 자체에 임의 점수나 중요도를 주지 마라. 보완 검색은 비교 후 별도 파이프라인이 수행한다.
+안전·환경 module_id=safety: 현재 CCTV 등록 위치는 참고 정보만 제공하며 안전 점수를 지원하지 않는다.
+CCTV 수나 근접성을 범죄/야간 안전, 보행 사고, 침수/재해, 소음/대기환경으로 대체하지 마라.
+이런 비교 요구는 미지원 criteria로 보존하라. 명시된 문제는 night_safety_or_environment_unverified,
+traffic_safety_or_environment_unverified, flood_safety_or_environment_unverified,
+noise_safety_or_environment_unverified, air_safety_or_environment_unverified를 사용한다.
+근거와 개인 수치 기준이 없으면 utility=null이다. 허구의 안전도 수치를 질문하지 마라.
+최신 공식 지역자료 보완 조사를 요청하면 safety_research=requested와 safety_topics에
+night,traffic,flood,noise,air 중 명시된 문제의 코드만 쉼표로 연결해 context에 보존하라.
+CCTV 참고 요청은 safety_reference=requested로 보존한다. 반경을 명시하면 safety_radius_m에 m 숫자를 문자열로 보존한다.
+반경은 CCTV 참고 범위이며 안전도 목표가 아니다. 가격처럼 참고 요청 자체는 점수 조건으로 만들지 마라.
+안전 보완 요청을 상가 후기 요청인 qualitative_research_requested로 중복 지정하지 마라.
 parameters의 school_level/school_id/subject/radius_m 중 해당 없는 필드는 null이다.
 다른 분야의 정성 조사 요청은 context qualitative_research_requested=requested로 보존하라.
 직선거리 목표/만족도 0 기준이 없으면 utility=null로 두고 직선거리 기준을 질문하라.
