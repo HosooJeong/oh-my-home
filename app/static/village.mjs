@@ -1,4 +1,4 @@
-import {CATEGORIES,STORAGE_KEY,RADII,readDraft,shares,levelForPosition,toggleCategory,moveBlock,setLevel,buildRequest} from './village-model.mjs';
+import {CATEGORIES,STORAGE_KEY,RADII,readDraft,shares,levelForPosition,toggleCategory,moveBlock} from './village-model.mjs';
 import {createToyModels,addToyStudio} from './village-models.mjs';
 
 const $=id=>document.getElementById(id);
@@ -7,12 +7,35 @@ try{draft=readDraft(sessionStorage.getItem(STORAGE_KEY));}catch{draft=readDraft(
 let mode=draft.entry?'town':'start',order=[],step=0,world=null;
 let motion=!matchMedia('(prefers-reduced-motion: reduce)').matches;
 const buttons=new Map();
+// Original SVG line icons share one stroke and never depend on font glyphs.
+const ICONS={
+ home:['M3 10 12 3l9 7','M5 9v12h14V9','M9 21v-7h6v7'],
+ search:['M16 16l5 5','M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0'],
+ 'arrow-left':['M20 12H4','m10 6-6 6 6 6'],
+ 'arrow-right':['M4 12h16','m14 6 6 6-6 6'],
+ 'rotate-left':['M3 8h5V3','M3 8a9 9 0 1 1-1 8'],
+ 'rotate-right':['M21 8h-5V3','M21 8a9 9 0 1 0 1 8'],
+ 'zoom-in':['M17 17l4 4','M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0','M6 10h8','M10 6v8'],
+ 'zoom-out':['M17 17l4 4','M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0','M6 10h8'],
+ living:['M12 21 3.8 13a5.2 5.2 0 0 1 7.4-7.3L12 6.5l.8-.8a5.2 5.2 0 0 1 7.4 7.3Z','M8 11h8','M12 7v8'],
+ transport:['M5 17V6a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v11Z','M5 10h14','M8 3v7','M8 14h.1','M16 14h.1','M7 17v4','M17 17v4'],
+ education:['M12 5v16','M12 5C9 3 5 3 2 5v14c3-2 7-2 10 2 3-4 7-4 10-2V5c-3-2-7-2-10 0'],
+ safety:['M12 2 3 6v6c0 5 5 8 9 10 4-2 9-5 9-10V6Z','m8 12 3 3 5-6'],
+ leisure:['M8 3 3 10h3l-4 6h12l-4-6h3Z','M8 16v6','M18 6l3 5h-2l3 5h-7','M18 16v6'],
+ housing:['M14 9a5 5 0 1 1-10 0 5 5 0 0 1 10 0','m13 12 9 9','m17 16 3-3','m19 18 3-3']
+};
+function icon(name){
+ const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.classList.add('icon');
+ for(const [key,value] of Object.entries({viewBox:'0 0 24 24',fill:'none',stroke:'currentColor','stroke-width':'1.75','stroke-linecap':'round','stroke-linejoin':'round','aria-hidden':'true',focusable:'false'}))svg.setAttribute(key,value);
+ for(const d of ICONS[name]){const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',d);svg.append(path);}return svg;
+}
+document.querySelectorAll('[data-icon]').forEach(el=>el.append(icon(el.dataset.icon)));
 const status=message=>$('village-status').textContent=message;
 function save(){try{sessionStorage.setItem(STORAGE_KEY,JSON.stringify(draft));}catch{status('현재 화면에서는 입력 저장을 사용할 수 없어.');}}
 function snapshot(){
  const percentages=shares(draft.blocks);
  return {mode,coordinate_system:'virtual floor: origin=home; X/Z horizontal; Y height; camera never changes priorities',focus:draft.focus,
-  blocks:draft.blocks.map(b=>({...b,level:levelForPosition(b.x,b.z),share:percentages[b.id]})),camera_yaw:world?.yaw??null,dragging:world?.dragId??null,webgl:!!world,motion};
+  blocks:draft.blocks.map(b=>({...b,level:levelForPosition(b.x,b.z),share:percentages[b.id]})),camera_yaw:world?.yaw??null,dragging:world?.dragId??null,webgl:!!world?.available,motion};
 }
 function expose(){const value=JSON.stringify(snapshot());$('scene-state').value=value;$('scene-state').textContent=value;}
 window.render_game_to_text=()=>JSON.stringify(snapshot());
@@ -20,34 +43,28 @@ window.advanceTime=ms=>{if(world)world.advance(Math.max(0,Math.min(Number(ms)||0
 
 for(const c of CATEGORIES){
  const button=document.createElement('button');button.type='button';button.dataset.category=c.id;button.style.setProperty('--brick-color',c.color);
- const brick=document.createElement('span');brick.className='tray-brick';brick.setAttribute('aria-hidden','true');
- const name=document.createElement('span');name.className='tray-text';name.append(document.createTextNode(c.label));
- const share=document.createElement('small');name.append(share);button.append(brick,name);buttons.set(c.id,{button,share});$('category-tray').append(button);
+ const mark=document.createElement('span');mark.className='category-icon';mark.append(icon(c.id));
+ button.append(mark,document.createTextNode(c.label));buttons.set(c.id,button);$('category-tray').append(button);
  button.addEventListener('click',()=>{if(toggleCategory(draft,c.id)){draft.handoff=false;save();render();status('');}});
 }
 function render(){
  $('village-app').dataset.mode=mode;
+ $('scene-wrap').hidden=['detail','review'].includes(mode);
  $('entry-panel').hidden=mode!=='start';$('location-panel').hidden=mode!=='location';
  $('town-tools').hidden=mode!=='town';$('detail-panel').hidden=!['detail','review'].includes(mode);
  $('question-view').hidden=mode!=='detail';$('review-view').hidden=mode!=='review';
- $('change-start').hidden=mode==='start';$('scene-controls').hidden=['start','location'].includes(mode);$('motion-toggle').hidden=['start','location'].includes(mode);
+ $('change-start').hidden=mode!=='town';$('scene-controls').hidden=mode!=='town';
  $('location-title').textContent=draft.entry==='discover'?'어느 생활권에서 찾을까?':'어느 동네를 생각해?';
  $('location-label').textContent=draft.entry==='discover'?'진주 안에서 찾을 지역':'후보 주소·동네';
  $('location-input').value=draft.location;
  const percentages=shares(draft.blocks);
- $('selection-count').textContent=`카테고리 ${draft.blocks.length}/6`;
- for(const c of CATEGORIES){const {button,share}=buttons.get(c.id),active=draft.blocks.some(b=>b.id===c.id);button.setAttribute('aria-pressed',String(active));button.disabled=active&&draft.blocks.length===1;share.textContent=active?`${percentages[c.id]}%`:'추가';}
- const block=draft.blocks.find(b=>b.id===draft.focus),category=CATEGORIES.find(c=>c.id===draft.focus);
- $('selected-controls').hidden=!block;$('open-details').disabled=!draft.blocks.length;
- const picker=$('selected-name');picker.replaceChildren();
- for(const b of draft.blocks){const option=document.createElement('option');option.value=b.id;option.textContent=CATEGORIES.find(c=>c.id===b.id).label;picker.append(option);}picker.value=draft.focus||'';
- if(block){const level=levelForPosition(block.x,block.z);$('priority-level').value=level;$('priority-level').setAttribute('aria-valuetext',`${level}단계, 1이 가장 중요, 비중 ${percentages[block.id]}%`);$('selected-share').value=`${percentages[block.id]}%`;$('selected-share').textContent=`${percentages[block.id]}%`;$('closer').disabled=level===1;$('farther').disabled=level===5;$('selected-reference').hidden=block.id!=='housing';}
- $('motion-toggle').textContent=motion?'움직임 켜짐':'움직임 꺼짐';$('motion-toggle').setAttribute('aria-pressed',String(motion));
+ for(const c of CATEGORIES){const button=buttons.get(c.id),active=draft.blocks.some(b=>b.id===c.id);button.setAttribute('aria-pressed',String(active));button.disabled=active&&draft.blocks.length===1;button.setAttribute('aria-label',c.label+(active?`, 배치 비중 ${percentages[c.id]}%`:''));}
+ $('open-details').disabled=!draft.blocks.length||!world?.available;
  if(mode==='detail'){
   const c=CATEGORIES.find(c=>c.id===order[step]);draft.focus=c.id;
   $('question-progress').textContent=`${step+1}/${order.length}`;$('question-category').textContent=c.label;$('question-label').textContent=c.question;
-  $('question-mark').style.setProperty('--brick-color',c.color);$('category-answer').value=draft.answers[c.id]||'';$('category-answer').placeholder=c.placeholder;
-  $('question-prev').disabled=step===0;$('question-next').textContent=step===order.length-1?'입력 확인':'다음';
+  $('question-mark').style.setProperty('--brick-color',c.color);$('question-mark').replaceChildren(icon(c.id));$('category-answer').value=draft.answers[c.id]||'';$('category-answer').placeholder=c.placeholder;
+  $('question-prev').hidden=step===0;$('question-next-label').textContent=step===order.length-1?'입력 확인':'다음';
  }else if(mode==='review'){
   $('question-progress').textContent=`${order.length}/${order.length}`;$('answer-summary').replaceChildren();
   for(const id of order){const c=CATEGORIES.find(c=>c.id===id),row=document.createElement('div');row.className='answer-item';const name=document.createElement('strong'),percent=document.createElement('span'),answer=document.createElement('p');name.textContent=c.label;percent.textContent=percentages[id]+'%';name.append(percent);answer.textContent=draft.answers[id]?.trim()||'아직 모르겠어';row.append(name,answer);$('answer-summary').append(row);}
@@ -59,23 +76,17 @@ $('location-input').addEventListener('input',event=>{draft.location=event.target
 $('location-back').addEventListener('click',()=>{mode='start';render();});
 $('change-start').addEventListener('click',()=>{mode='start';world?.cancelDrag();render();});
 $('enter-town').addEventListener('click',()=>{mode='town';save();render();status(draft.blocks.length?'':'블록을 골라 집 주변에 놓아봐.');});
-function changeLevel(level){if(setLevel(draft,draft.focus,level)){draft.handoff=false;save();render();status('');}}
-$('selected-name').addEventListener('change',event=>{draft.focus=event.target.value;save();render();});
-$('closer').addEventListener('click',()=>{const b=draft.blocks.find(b=>b.id===draft.focus);if(b)changeLevel(levelForPosition(b.x,b.z)-1);});
-$('farther').addEventListener('click',()=>{const b=draft.blocks.find(b=>b.id===draft.focus);if(b)changeLevel(levelForPosition(b.x,b.z)+1);});
-$('priority-level').addEventListener('input',event=>changeLevel(Number(event.target.value)));
-$('open-details').addEventListener('click',()=>{if(!draft.blocks.length)return;order=draft.blocks.slice().sort((a,b)=>levelForPosition(a.x,a.z)-levelForPosition(b.x,b.z)).map(b=>b.id);step=0;mode='detail';world?.cancelDrag();status('');render();});
-$('back-town').addEventListener('click',()=>{mode='town';render();});
+$('open-details').addEventListener('click',()=>{if(mode!=='town'||!draft.blocks.length||!world?.available)return;world.cancelDrag();order=draft.blocks.slice().sort((a,b)=>levelForPosition(a.x,a.z)-levelForPosition(b.x,b.z)).map(b=>b.id);step=0;mode='detail';save();status('');render();window.scrollTo(0,0);});
+$('back-town').addEventListener('click',()=>{mode='town';render();window.scrollTo(0,0);});
 $('category-answer').addEventListener('input',event=>{draft.answers[order[step]]=event.target.value.slice(0,450);draft.handoff=false;save();});
-function nextQuestion(){if(step<order.length-1)step++;else mode='review';save();render();}
+function nextQuestion(){if(step<order.length-1)step++;else mode='review';save();render();window.scrollTo(0,0);}
 $('question-next').addEventListener('click',nextQuestion);
 $('question-prev').addEventListener('click',()=>{step=Math.max(0,step-1);render();});
 $('question-unknown').addEventListener('click',()=>{draft.answers[order[step]]='';nextQuestion();});
-$('continue-workspace').addEventListener('click',()=>{draft.handoff=true;save();location.assign('/workspace');});
+$('continue-workspace').addEventListener('click',()=>{if(mode!=='review')return;draft.handoff=true;save();location.assign('/workspace');});
 $('turn-left').addEventListener('click',()=>world?.rotate(-Math.PI/4));$('turn-right').addEventListener('click',()=>world?.rotate(Math.PI/4));
 $('zoom-in').addEventListener('click',()=>world?.zoom(1.15));$('zoom-out').addEventListener('click',()=>world?.zoom(1/1.15));
-$('motion-toggle').addEventListener('click',()=>{motion=!motion;render();});
-document.addEventListener('keydown',event=>{if(event.key.toLowerCase()==='f'&&!['INPUT','TEXTAREA'].includes(event.target.tagName)){if(document.fullscreenElement)document.exitFullscreen?.();else $('scene-wrap').requestFullscreen?.();}});
+document.addEventListener('keydown',event=>{if(mode==='town'&&event.key.toLowerCase()==='f'&&!['INPUT','TEXTAREA'].includes(event.target.tagName)){if(document.fullscreenElement)document.exitFullscreen?.();else $('scene-wrap').requestFullscreen?.();}});
 render();
 
 try{
@@ -89,7 +100,7 @@ function createWorld(T){
  renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;
  const scene=new T.Scene();scene.background=new T.Color('#e5ecdf');
  const toys=createToyModels(T);addToyStudio(T,renderer,scene);
- const camera=new T.OrthographicCamera(-15,15,11,-11,.1,100);let yaw=Math.PI/4,zoomValue=1,elapsed=0,lastTime=0,drag=null;
+ const camera=new T.OrthographicCamera(-15,15,11,-11,.1,100);let yaw=Math.PI/4,zoomValue=1,elapsed=0,lastTime=0,drag=null,available=true;
  const materials=new Map();const boxGeometry=new T.BoxGeometry(1,1,1),studGeometry=new T.CylinderGeometry(.12,.12,.085,12),sphereGeometry=new T.SphereGeometry(1,12,8);
  function mat(color){if(!materials.has(color))materials.set(color,new T.MeshStandardMaterial({color,roughness:.72,metalness:0}));return materials.get(color);}
  function mesh(group,geometry,color,x,y,z,sx=1,sy=1,sz=1){const m=new T.Mesh(geometry,mat(color));m.position.set(x,y,z);m.scale.set(sx,sy,sz);m.castShadow=true;m.receiveShadow=true;group.add(m);return m;}
@@ -120,7 +131,7 @@ function createWorld(T){
  const people=[];for(const [x,z,color] of [[-3,9,'#cb8872'],[9,5,'#8cabc0']]){const p=toys.person(color);p.scale.setScalar(.75);p.position.set(x,.2,z);scene.add(p);people.push(p);}
  const raycaster=new T.Raycaster(),pointer=new T.Vector2(),floor=new T.Plane(new T.Vector3(0,1,0),-.15),point=new T.Vector3();
  function updateCamera(){const r=27;camera.position.set(Math.sin(yaw)*r,24,Math.cos(yaw)*r);camera.lookAt(0,0,0);camera.zoom=zoomValue;camera.updateProjectionMatrix();camera.updateMatrixWorld();}
- function resize(){const width=container.clientWidth,height=container.clientHeight,aspect=width/height,v=Math.max(22,30/aspect);const offset=['start','location'].includes(mode) ? .22 : 0;camera.left=-v*aspect/2+v*aspect*offset;camera.right=v*aspect/2+v*aspect*offset;camera.top=v/2;camera.bottom=-v/2;renderer.setSize(width,height,false);updateCamera();draw();}
+ function resize(){const width=container.clientWidth,height=container.clientHeight;if(!width||!height||!available)return;const aspect=width/height,v=Math.max(22,30/aspect);const offset=['start','location'].includes(mode) ? .22 : 0;camera.left=-v*aspect/2+v*aspect*offset;camera.right=v*aspect/2+v*aspect*offset;camera.top=v/2;camera.bottom=-v/2;renderer.setSize(width,height,false);updateCamera();draw();}
  function sync(){
   const percentages=shares(draft.blocks);
   for(const c of CATEGORIES){const g=models.get(c.id),b=draft.blocks.find(v=>v.id===c.id),item=labels.get(c.id);g.visible=!!b;item.label.hidden=!b;
@@ -147,14 +158,15 @@ function createWorld(T){
  canvas.addEventListener('pointerup',finishDrag);canvas.addEventListener('pointercancel',()=>{cancelDrag();render();});canvas.addEventListener('lostpointercapture',event=>{if(drag&&drag.pointer===event.pointerId){cancelDrag();render();}});
  canvas.addEventListener('wheel',event=>{if(mode!=='town')return;event.preventDefault();zoomValue=Math.min(2.8,Math.max(.8,zoomValue*Math.exp(-event.deltaY*.001)));updateCamera();draw();},{passive:false});
  function draw(){
+  if(container.hidden||!available)return;
   renderer.render(scene,camera);const width=container.clientWidth,height=container.clientHeight;
   for(const c of CATEGORIES){const g=models.get(c.id),item=labels.get(c.id);if(!g.visible)continue;const p=new T.Vector3(g.position.x,g.position.y+(g.userData.labelHeight||2.15),g.position.z).project(camera);const x=(p.x+1)/2*width,y=(1-p.y)/2*height;item.label.style.left=x+'px';item.label.style.top=y+'px';item.label.hidden=x<35||x>width-35||y<20||y>height-40;}
  }
  function advance(dt){elapsed+=dt;if(motion){const t=elapsed*.17%4;if(t<1){bus.position.set(-8+t*16,.35,9);bus.rotation.y=0;}else if(t<2){bus.position.set(9,.35,9-(t-1)*17);bus.rotation.y=Math.PI/2;}else if(t<3){bus.position.set(9-(t-2)*17,.35,-9);bus.rotation.y=Math.PI;}else{bus.position.set(-9,.35,-9+(t-3)*17);bus.rotation.y=-Math.PI/2;}people[0].position.x=-3+Math.sin(elapsed*.3)*1.2;people[1].position.z=5+Math.sin(elapsed*.25)*.9;}
   for(const [id,g] of models){const age=elapsed-(g.userData.landed??-10);const bounce=motion&&age<1 ? Math.abs(Math.sin(age*18))*Math.exp(-age*8)*.12 : 0;g.position.y=.15+(drag?.id===id ? .22 : bounce);}draw();}
- function loop(time){if(!document.hidden)advance(Math.min((time-lastTime)/1000,.05));lastTime=time;requestAnimationFrame(loop);}
+ function loop(time){if(!document.hidden&&!container.hidden&&available)advance(Math.min((time-lastTime)/1000,.05));lastTime=time;requestAnimationFrame(loop);}
  new ResizeObserver(resize).observe(container);document.addEventListener('fullscreenchange',resize);
- canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();$('fallback-note').hidden=false;status('3D 연결이 끊겼어. 아래 중요도 조절은 계속 사용할 수 있어.');});
+ canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();cancelDrag();available=false;$('fallback-note').hidden=false;render();status('3D 연결이 끊겼어. 화면을 새로고침해 봐.');});
  updateCamera();sync();requestAnimationFrame(loop);
- return {sync,cancelDrag,advance,get yaw(){return yaw;},get dragId(){return drag?.id||null;},rotate(amount){if(drag)return;yaw+=amount;updateCamera();draw();expose();},zoom(factor){zoomValue=Math.min(2.8,Math.max(.8,zoomValue*factor));updateCamera();draw();}};
+ return {sync,cancelDrag,advance,get available(){return available;},get yaw(){return yaw;},get dragId(){return drag?.id||null;},rotate(amount){if(drag)return;yaw+=amount;updateCamera();draw();expose();},zoom(factor){zoomValue=Math.min(2.8,Math.max(.8,zoomValue*factor));updateCamera();draw();}};
 }

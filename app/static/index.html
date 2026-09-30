@@ -1,29 +1,26 @@
 <!doctype html>
 <html lang="ko">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f3f1e9"><title>살자리 · 나의 생활 마을</title><link rel="stylesheet" href="/village.css"><script type="module" src="/village.mjs"></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f3f1e9"><title>살자리</title><link rel="stylesheet" href="/village.css"><script type="module" src="/village.mjs"></script></head>
 <body>
-<header class="app-header"><a class="brand" href="/">살자리<span>나의 생활 마을</span></a><nav><button id="change-start" class="text-button" type="button" hidden>처음으로</button><a href="/workspace" class="text-button">지도·비교</a></nav></header>
+<header class="app-header"><a class="brand" href="/">살자리</a><button id="change-start" class="icon-button" type="button" aria-label="시작 화면으로" data-icon="home" hidden></button></header>
 <main id="village-app" data-mode="start">
- <div class="scene-row">
-  <section id="scene-wrap" class="scene-wrap" aria-label="나의 생활 마을">
-   <canvas id="village-canvas" aria-label="중앙 집 주변에 원하는 카테고리 블록을 배치하는 3D 마을"></canvas><div id="block-labels" class="block-labels" aria-hidden="true"></div>
-   <div class="scene-heading"><h1>중요한 것을, 집 가까이.</h1></div>
-   <div id="scene-controls" class="scene-controls" hidden><button id="turn-left" type="button" aria-label="마을 왼쪽으로 회전">↶</button><button id="turn-right" type="button" aria-label="마을 오른쪽으로 회전">↷</button><button id="zoom-in" type="button" aria-label="마을 확대">＋</button><button id="zoom-out" type="button" aria-label="마을 축소">−</button></div>
-   <button id="motion-toggle" class="motion-toggle" type="button" aria-pressed="true" hidden>움직임 켜짐</button>
-   <div id="fallback-note" class="fallback-note" hidden>3D 화면을 사용할 수 없어. 아래에서 선택과 중요도를 정할 수 있어.</div>
-   <section id="entry-panel" class="floating-panel entry-panel"><h2>어디서 시작할까?</h2><button type="button" data-entry="known"><span class="entry-symbol">⌂</span><span>후보·주소가 있어</span><span>→</span></button><button type="button" data-entry="discover"><span class="entry-symbol">◇</span><span>처음부터 찾을래</span><span>→</span></button></section>
-   <section id="location-panel" class="floating-panel location-panel" hidden><button id="location-back" class="text-button" type="button">← 이전</button><h2 id="location-title">어느 동네를 생각해?</h2><label for="location-input" id="location-label">후보 주소·동네</label><input id="location-input" maxlength="200" placeholder="예: 진주 평거동, 생각해 둔 주소"><p class="tiny-note">위치는 다음 지도에서 직접 지정해.</p><button id="enter-town" class="primary" type="button">내 마을 만들기</button></section>
-  </section>
-  <section id="detail-panel" class="detail-panel" hidden>
-   <div class="detail-top"><button id="back-town" class="text-button" type="button">← 마을 배치</button><span id="question-progress"></span></div>
-   <div id="question-view"><div class="category-mark" id="question-mark"></div><h2 id="question-category"></h2><label id="question-label" for="category-answer"></label><textarea id="category-answer" rows="6" maxlength="450"></textarea><div class="question-actions"><button id="question-prev" type="button">이전</button><button id="question-next" class="primary" type="button">다음</button></div><button id="question-unknown" class="text-button" type="button">아직 모르겠어</button></div>
-   <div id="review-view" hidden><h2>내 조건</h2><div id="answer-summary"></div><button id="continue-workspace" class="primary" type="button">조건 정리로 이어가기</button><p class="tiny-note">다음 화면에서 AI로 조건을 정리하고 위치를 지정해.</p></div>
-  </section>
- </div>
- <section id="town-tools" class="town-tools" hidden>
-  <div class="tool-top"><span id="selection-count">카테고리 0/6</span><div id="selected-controls" class="selected-controls" hidden><select id="selected-name" aria-label="중요도를 조절할 카테고리"></select><button id="closer" type="button" aria-label="선택한 블록을 집에 한 단계 가까이">−</button><label for="priority-level" class="sr-only">선택 블록 중요도 단계</label><input id="priority-level" type="range" min="1" max="5" value="3"><button id="farther" type="button" aria-label="선택한 블록을 집에서 한 단계 멀리">＋</button><output id="selected-share"></output><span id="selected-reference" class="tiny-note" hidden>실거래 참고</span></div><button id="open-details" class="primary" type="button" disabled>상세 조건 입력 →</button></div>
-  <div id="category-tray" class="category-tray" aria-label="함께 고려할 카테고리"></div>
+ <section id="scene-wrap" class="scene-wrap" aria-label="나의 생활 마을">
+  <canvas id="village-canvas" aria-label="블록을 끌어 놓으면 집과의 거리로 중요도가 바뀌는 3D 마을"></canvas><div id="block-labels" class="block-labels" aria-hidden="true"></div>
+  <div class="scene-heading"><h1>중요한 것을, 집 가까이.</h1></div>
+  <div id="scene-controls" class="scene-controls" hidden><button id="turn-left" class="icon-button" type="button" aria-label="마을 왼쪽으로 회전" data-icon="rotate-left"></button><button id="turn-right" class="icon-button" type="button" aria-label="마을 오른쪽으로 회전" data-icon="rotate-right"></button><button id="zoom-in" class="icon-button" type="button" aria-label="마을 확대" data-icon="zoom-in"></button><button id="zoom-out" class="icon-button" type="button" aria-label="마을 축소" data-icon="zoom-out"></button></div>
+  <div id="fallback-note" class="fallback-note" hidden>3D 화면을 사용할 수 없어. 화면을 새로고침하거나 다른 브라우저에서 열어봐.</div>
+  <section id="entry-panel" class="floating-panel entry-panel"><h2>어디서 시작할까?</h2><button type="button" data-entry="known"><span class="entry-symbol" data-icon="home"></span><span>후보·주소가 있어</span><span data-icon="arrow-right"></span></button><button type="button" data-entry="discover"><span class="entry-symbol" data-icon="search"></span><span>처음부터 찾을래</span><span data-icon="arrow-right"></span></button></section>
+  <section id="location-panel" class="floating-panel location-panel" hidden><button id="location-back" class="text-button" type="button"><span data-icon="arrow-left"></span>이전</button><h2 id="location-title">어느 동네를 생각해?</h2><label for="location-input" id="location-label">후보 주소·동네</label><input id="location-input" maxlength="200" placeholder="예: 진주 평거동, 생각해 둔 주소"><button id="enter-town" class="primary" type="button">내 마을 만들기<span data-icon="arrow-right"></span></button></section>
  </section>
- <div id="village-status" class="village-status" role="status" aria-live="polite"></div><output id="scene-state" hidden></output>
+ <section id="town-tools" class="town-tools" hidden>
+  <div id="category-tray" class="category-tray" aria-label="고려할 카테고리 선택"></div>
+  <button id="open-details" class="primary" type="button" disabled>배치 완료<span data-icon="arrow-right"></span></button>
+ </section>
+ <section id="detail-panel" class="detail-panel" aria-label="상세 조건 입력" hidden>
+  <div class="detail-top"><button id="back-town" class="text-button" type="button"><span data-icon="arrow-left"></span>배치로 돌아가기</button><span id="question-progress"></span></div>
+  <div id="question-view"><div class="question-category"><span class="category-mark" id="question-mark"></span><span id="question-category"></span></div><h1><label id="question-label" for="category-answer"></label></h1><textarea id="category-answer" rows="5" maxlength="450"></textarea><div class="question-actions"><button id="question-prev" class="icon-button" type="button" aria-label="이전 질문" data-icon="arrow-left"></button><button id="question-next" class="primary" type="button"><span id="question-next-label">다음</span><span data-icon="arrow-right"></span></button></div><button id="question-unknown" class="text-button" type="button">아직 모르겠어</button></div>
+  <div id="review-view" hidden><h1>내 조건</h1><div id="answer-summary"></div><button id="continue-workspace" class="primary" type="button">조건 정리하기<span data-icon="arrow-right"></span></button></div>
+ </section>
+ <div id="village-status" class="village-status sr-only" role="status" aria-live="polite"></div><output id="scene-state" hidden></output>
 </main>
 </body></html>
