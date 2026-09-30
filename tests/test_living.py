@@ -208,6 +208,24 @@ class HttpTests(unittest.TestCase):
         self.assertEqual(self.call("/api/bootstrap", headers={"Origin": "http://evil.invalid"})[0], 403)
         self.assertEqual(self.call("/api/bootstrap", headers={"Host": "evil.invalid"})[0], 403)
 
+    def test_village_entry_and_local_module_chain_keep_workspace_available(self):
+        for path, content_type, marker in [
+            ("/", "text/html", b'id="village-canvas"'),
+            ("/workspace", "text/html", b"/app.js"),
+            ("/village.mjs", "javascript", b"./vendor/three/three.module.min.js"),
+            ("/village-model.mjs", "javascript", b"applyVillagePreferences"),
+            ("/vendor/three/three.module.min.js", "javascript", b"./three.core.min.js"),
+            ("/vendor/three/three.core.min.js", "javascript", b"180"),
+        ]:
+            with self.subTest(path=path):
+                connection = HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+                connection.request("GET", path)
+                response = connection.getresponse()
+                self.assertEqual(response.status, 200)
+                self.assertIn(content_type, response.getheader("Content-Type"))
+                self.assertIn(marker, response.read())
+                connection.close()
+
     def test_real_http_compare_and_session_isolation(self):
         _, bootstrap = self.call("/api/bootstrap")
         headers = {"X-Session": bootstrap["token"]}

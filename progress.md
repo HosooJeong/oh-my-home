@@ -1,0 +1,13 @@
+Original prompt: 좋아 재밌어보여. 시작해보자 — Three.js 중앙 집/카테고리 블록 배치, 1~6개 선택, 거리별 중요도, 마을 수평 회전과 최소 장식. 핵심 UI만 남기고 검증은 필요한 만큼만.
+
+## 2026-10-01
+- 첫 범위: 블록 선택/배치·거리 중요도·회전·짧은 질문→기존 조건 정리 화면 전달.
+- 기존 지도/모듈은 /workspace에서 유지. 주소 지오코딩/단독 분석/후단 비동기 통합은 후속.
+- Three.js 0.180.0 MIT 배포 모듈 두 개와 LICENSE를 로컬 패키지에서 vendor에 보존.
+- 사용자 최소 검증 요청/현재 브라우저 제어 규칙에 맞춰 순수 계산 검사와 CUA 실제 브라우저를 사용. 스킬의 터미널 Playwright 반복 실행 대신 같은 핵심 상태/화면을 CUA로 확인.
+- 완료: 실제 Three.js 집/6종 블록·1~6개·5단계/겹침 보호·드래그·회전/확대·버튼/선택창·선택 질문·초안→기존 요청 전달.
+- 검사: Node 순수 상태8개 및 HTTP3개 통과, JS/Python 문법 확인. 첫 node --test는 샌드박스 spawn EPERM으로 실행 실패해 직접 Node runner로 전환. unittest 패키지 경로 오류는 tests 경로를 지정해 해결.
+- 실제 화면: 6→1→3개, 드래그로 생활3→1단계/비중16.7→25%, 회전 불변, 선택창/버튼, 답변 이전 보존·모름, /workspace 전달과 카카오 지도 초기화.390px 가로 넘침0.
+- 수정: findBlock의 지역변수 hit가 함수 hit를 가려 입력 오류 발생→intersection으로 수정/재확인. 모바일 column flex 높이 축소→flex:none 적용/확인. 수정 후 새 콘솔 오류/경고0.
+- 한계: 주소는 메모, 단독/집값 단독 결과·실제 모듈 상태/결과 새 UI·기타 조건 후속. 신규 서비스 LLM 호출/전체회귀/실휴대폰·성능·3D 실패 재현 미실행.
+- 증거: 상위 work/saljari-evidence/20261001/village01-*; canonical records remain in AIcontest/docs/project-records.

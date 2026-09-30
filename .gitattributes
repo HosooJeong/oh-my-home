@@ -1,0 +1,2 @@
+# Preserve the original vendored distribution bytes and their recorded hashes.
+app/static/vendor/three/* -text

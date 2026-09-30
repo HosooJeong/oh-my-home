@@ -357,6 +357,12 @@ def make_handler(state, env_path):
                 self.guard()
                 path = urlsplit(self.path).path
                 files = {"/": (STATIC / "index.html", "text/html; charset=utf-8"),
+                         "/workspace": (STATIC / "workspace.html", "text/html; charset=utf-8"),
+                         "/village.css": (STATIC / "village.css", "text/css; charset=utf-8"),
+                         "/village.mjs": (STATIC / "village.mjs", "text/javascript; charset=utf-8"),
+                         "/village-model.mjs": (STATIC / "village-model.mjs", "text/javascript; charset=utf-8"),
+                         "/vendor/three/three.module.min.js": (STATIC / "vendor/three/three.module.min.js", "text/javascript; charset=utf-8"),
+                         "/vendor/three/three.core.min.js": (STATIC / "vendor/three/three.core.min.js", "text/javascript; charset=utf-8"),
                          "/app.js": (STATIC / "app.js", "text/javascript; charset=utf-8"),
                          "/candidates.js": (STATIC / "candidates.js", "text/javascript; charset=utf-8"),
                          "/reviews.js": (STATIC / "reviews.js", "text/javascript; charset=utf-8"),

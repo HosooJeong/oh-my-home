@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>살자리 · 나에게 맞는 동네 찾기</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script><script src="/transport.js" defer></script><script src="/reviews.js" defer></script><script src="/candidates.js" defer></script><script src="/housing.js" defer></script><script src="/education.js" defer></script><script src="/safety.js" defer></script><script src="/leisure.js" defer></script></head>
+<body>
+<header><a class="brand" href="/">살자리<span>나에게 맞는 동네 찾기</span></a><a class="quiet-link" href="/samples">자료 지도 보기</a></header>
+<main>
+  <section class="intro"><p class="eyebrow">생활권 · 내 기준으로 비교</p><h1>어떤 생활을<br>담을 곳이 필요해?</h1><p>원하는 생활을 적고, 지도에서 후보를 골라 봐.<br>같은 동네도 네 기준에 따라 다르게 비교할 수 있어.</p></section>
+  <div id="status" class="status" role="status" aria-live="polite">자료를 불러오는 중이야.</div>
+  <div class="workspace">
+    <div class="sidebar">
+      <section class="panel"><h2><span class="step">01</span> 내 생활 조건</h2>
+        <fieldset id="intake-fields"><label for="request">어떤 곳에서 살고 싶어?</label><textarea id="request" rows="5" maxlength="4000" placeholder="버스로 출퇴근할 거야. 정류장이 가까웠으면 좋겠고, 마트에서 자주 장을 봐."></textarea>
+        <p class="hint">AI가 니즈와 중요도를 정리하고, 필요한 내용만 더 물어볼게. 입력은 연결된 ChatGPT 계정으로 보내져.</p>
+        <button id="intake" class="primary" type="button">AI로 조건 정리</button></fieldset>
+        <button id="cancel" type="button" hidden>정리 취소</button>
+        <details id="quick"><summary>거리와 중요도를 직접 정할래</summary><form id="quick-form"><fieldset id="quick-fields">
+          <p class="hint">아래 값을 선택하면 두 시설의 직선거리로 비교해. 마트는 자료의 슈퍼마켓 업종이야.</p>
+          <div class="pair"><label>이상적인 거리 (m)<input name="ideal" type="number" min="0" max="20000" value="300" required></label><label>만족도 0인 거리 (m)<input name="limit" type="number" min="1" max="50000" value="1000" required></label></div>
+          <div class="pair"><label>마트 중요도<input name="supermarket_weight" type="number" min="0" max="100" value="70" required></label><label>편의점 중요도<input name="convenience_weight" type="number" min="0" max="100" value="30" required></label></div>
+          <label class="check"><input name="mandatory_limit" type="checkbox">두 시설 모두 위 최대 거리 이내여야 해</label>
+          <button type="submit">이 조건 사용</button>
+        </fieldset></form></details>
+      </section>
+      <section class="panel"><h2>학교·학원 조건</h2><p id="education-data-note" class="hint"></p>
+        <form id="education-form"><fieldset id="education-fields">
+          <label for="school-level">학교급</label><select id="school-level"><option value="elementary">초등학교</option><option value="middle">중학교</option><option value="high">고등학교</option></select>
+          <label for="school-travel">통학 방식</label><select id="school-travel"><option value="unknown">아직 정하지 않았어</option><option value="alone">혼자 도보</option><option value="accompanied">보호자 동행</option><option value="car">보호자 차량</option><option value="shuttle">셔틀</option></select>
+          <label class="check"><input id="include-school" type="checkbox" checked>학교 접근성 비교</label>
+          <div class="pair"><label>학교 목표 거리 (m)<input id="school-ideal" type="number" min="0" max="20000" value="500" required></label><label>학교 만족도 0 거리 (m)<input id="school-limit" type="number" min="1" max="50000" value="1500" required></label></div>
+          <label class="check"><input id="include-academy" type="checkbox">필요한 과목의 학원 선택지 비교</label>
+          <label for="academy-subject">학원 과목</label><select id="academy-subject"><option value="math">수학</option><option value="english">영어</option><option value="korean">국어</option><option value="science">과학</option><option value="art">미술</option><option value="music">음악</option></select>
+          <div class="pair"><label>학원 직선반경 (m)<input id="academy-radius" type="number" min="1" max="20000" value="1000" required></label><label>충분한 선택지 (개소)<input id="academy-sufficient" type="number" min="1" max="100" value="3" required></label></div>
+          <div class="pair"><label>학교 조건 중요도<input id="school-importance" type="number" min="0" max="100" value="70" required></label><label>학원 조건 중요도<input id="academy-importance" type="number" min="0" max="100" value="30" required></label></div>
+          <label>교육 분야 중요도<input id="education-weight" type="number" min="0" max="100" value="30" required></label>
+          <p class="hint">숫자는 편집용 제안값이야. 적용할 때 네 기준으로 확인해 줘. 가까운 학교가 배정 학교는 아니야. 통학로·횡단·안전은 아직 미확인이야.</p>
+          <label class="check"><input id="education-research" type="checkbox">학원 수업 형태·규모·일부 경험도 최신 웹자료로 보완</label>
+          <button type="submit">교육 조건 적용</button>
+        </fieldset></form>
+      </section>
+      <section class="panel"><h2>안전·환경 조건</h2><p id="safety-data-note" class="hint"></p>
+        <form id="safety-form"><fieldset id="safety-fields">
+          <p>어떤 문제가 중요해?</p>
+          <label class="check"><input name="safety-topic" value="night" type="checkbox">야간 보행 안전</label>
+          <label class="check"><input name="safety-topic" value="traffic" type="checkbox">보행·교통사고</label>
+          <label class="check"><input name="safety-topic" value="flood" type="checkbox">침수·재해</label>
+          <label class="check"><input name="safety-topic" value="noise" type="checkbox">소음</label>
+          <label class="check"><input name="safety-topic" value="air" type="checkbox">대기환경</label>
+          <div class="pair"><label>안전·환경 분야 중요도<input id="safety-weight" type="number" min="0" max="100" value="30" required></label><label>선택한 각 조건 중요도<input id="safety-importance" type="number" min="0" max="100" value="100" required></label></div>
+          <label>CCTV 참고 직선반경 (m)<input id="safety-radius" type="number" min="1" max="5000" value="500" required></label>
+          <p class="hint">숫자는 적용 전 제안값이야. CCTV 등록 지점은 참고이며 안전 점수가 아니야. 문제별 근거가 부족하면 중요도를 유지하고 전체 순위를 보류해. 서로 다른 조건의 중요도는 아래에서 따로 바꿀 수 있어.</p>
+          <label class="check"><input id="safety-research" type="checkbox">후보 지역의 최신 공식 웹자료로 선택한 문제 보완</label>
+          <button type="submit">안전·환경 조건 적용</button>
+        </fieldset></form>
+      </section>
+      <section class="panel"><h2>여가·관계 조건</h2><p id="leisure-data-note" class="hint"></p>
+        <form id="leisure-form"><fieldset id="leisure-fields">
+          <label class="check"><input id="include-park" type="checkbox">공원 접근성</label>
+          <label>공원 유형<select id="park-type"><option value="any">전체 도시공원</option><option value="children">어린이공원</option><option value="neighborhood">근린공원</option></select></label>
+          <label class="check"><input id="include-library" type="checkbox">도서관 접근성</label>
+          <label>도서관 유형<select id="library-type"><option value="any">공공·작은도서관</option><option value="public">공공도서관</option><option value="small">작은도서관</option></select></label>
+          <div class="pair"><label>이상적 직선거리 (m)<input id="leisure-ideal" type="number" min="0" max="20000" step="any" value="500" required></label><label>만족도 0 거리 (m)<input id="leisure-limit" type="number" min="1" max="50000" step="any" value="1500" required></label></div>
+          <div class="pair"><label>공원 중요도<input id="park-importance" type="number" min="0" max="100" value="40" required></label><label>도서관 중요도<input id="library-importance" type="number" min="0" max="100" value="20" required></label></div>
+          <label class="check"><input id="include-meeting" type="checkbox">지정 만남 지점까지 거리</label>
+          <label>만남 지점 이름<input id="meeting-label" maxlength="100" placeholder="예: 가족과 만나는 장소"></label>
+          <div class="pair"><label>지점 위도<input id="meeting-lat" type="number" min="-90" max="90" step="any"></label><label>지점 경도<input id="meeting-lon" type="number" min="-180" max="180" step="any"></label></div>
+          <label>만남 지점 중요도<input id="meeting-importance" type="number" min="0" max="100" value="20" required></label>
+          <label class="check"><input id="include-hobby" type="checkbox">사설 취미시설도 찾아보기</label>
+          <label>취미 종목<select id="hobby-activity"><option value="gym">헬스</option><option value="pilates">필라테스</option><option value="table_tennis">탁구</option><option value="swimming">수영</option><option value="tennis">테니스</option><option value="yoga">요가</option><option value="other">다른 취미 직접 입력</option></select></label>
+          <label>직접 입력할 취미<input id="hobby-name" maxlength="100" placeholder="예: 배드민턴, 클라이밍"></label>
+          <label>원하는 이용 형태<input id="hobby-form" maxlength="100" placeholder="예: 기구 필라테스 소그룹, 탁구 자유 이용"></label>
+          <div class="pair"><label>취미 중요도<input id="hobby-importance" type="number" min="0" max="100" value="20" required></label><label>여가 분야 중요도<input id="leisure-weight" type="number" min="0" max="100" value="30" required></label></div>
+          <p class="hint">숫자는 적용 전 제안값이야. 공원·도서관·만남은 직선거리로 비교하고, 취미시설의 이용 형태·경험은 웹으로 보완해. 미확인 조건의 중요도는 유지해.</p>
+          <button type="submit">여가·관계 조건 적용</button>
+        </fieldset></form>
+      </section>
+      <section id="profile-panel" class="panel" hidden><h2>정리한 니즈</h2><div id="context"></div><div id="criteria"></div><form id="interview"><div id="questions"></div><button id="answer" type="submit" hidden>답변 반영</button></form>
+        <details id="transport-editor"><summary>교통 조건 확인·수정</summary>
+          <form id="transport-form"><fieldset id="transport-fields">
+            <label for="travel-mode">주 이동수단</label><select id="travel-mode"><option value="unknown">아직 정하지 않았어</option><option value="bus">버스 중심</option><option value="car">자차 중심</option><option value="walking">도보 중심</option><option value="mixed">여러 수단 이용</option></select>
+            <label for="travel-destination">출퇴근·자주 가는 목적지<input id="travel-destination" maxlength="200" placeholder="예: 진주시청"></label>
+            <label for="travel-time">주로 이동하는 시간대<input id="travel-time" maxlength="120" placeholder="예: 평일 오전 8시"></label>
+            <p class="hint">목적지와 시간대는 니즈로 보존해. 현재 비교할 수 있는 교통 조건은 정류장까지의 직선거리야.</p>
+            <label class="check"><input id="include-stop" type="checkbox">정류장 접근성도 비교할래</label>
+            <fieldset id="stop-fields" disabled>
+              <div class="pair"><label>이상적 직선거리 (m)<input id="stop-ideal" type="number" min="0" max="20000" step="any" value="300" required></label><label>만족도 0 거리 (m)<input id="stop-limit" type="number" min="1" max="50000" step="any" value="1000" required></label></div>
+              <div class="pair"><label>교통 분야 중요도<input id="transport-weight" type="number" min="0" max="100" value="30" required></label><label>정류장 조건 중요도<input id="stop-importance" type="number" min="0" max="100" value="100" required></label></div>
+              <p class="hint">300m·1,000m는 편집용 초기값이야. 적용할 때 네 기준으로 확인해 줘. 중요도는 다른 분야·조건과의 상대적 비중이야.</p>
+              <label class="check"><input id="stop-mandatory" type="checkbox">정류장은 위 최대 거리 이내여야 해</label>
+            </fieldset>
+            <button id="apply-transport" type="submit">교통 조건 적용</button>
+          </fieldset></form>
+        </details>
+        <details open><summary>나의 중요도</summary><div id="weights"></div><p class="hint">분야 비중 × 분야 안 조건 비중으로 반영해. 0은 평가에서 제외하며 필수조건은 계속 확인해.</p><button id="reweight" type="button">중요도 확정하고 다시 계산</button></details>
+      </section>
+    </div>
+    <div class="content">
+      <section class="panel map-panel"><div class="section-heading"><h2><span class="step">02</span> 비교할 위치</h2><button id="demo" class="subtle" type="button">예시 위치 3곳</button></div>
+        <p class="hint">진주에서 2~6곳을 골라 줘. 예시 위치는 사용법을 위한 좌표이며 주택 추천이 아니야.</p>
+        <details id="generation-editor" open><summary>내 조건으로 분석 지점 찾기</summary>
+          <p id="generation-data-note" class="hint"></p><a class="external-link" href="https://www.data.go.kr/data/15129688/fileData.do" target="_blank" rel="noopener noreferrer">행정경계 자료 출처</a>
+          <form id="generation-form"><fieldset id="generation-fields">
+            <label for="generation-area">찾을 지역</label><select id="generation-area"><option value="">진주 전체의 준비된 분석 지점</option></select>
+            <div class="pair"><label for="generation-count">찾을 지점 수<select id="generation-count"><option value="2">2곳</option><option value="3" selected>3곳</option><option value="4">4곳</option><option value="5">5곳</option><option value="6">6곳</option></select></label><label for="generation-separation">후보 사이 최소 거리 (m)<input id="generation-separation" type="number" min="0" max="5000" step="any" value="1000" required></label></div>
+            <p class="hint">현재 거리 기준과 중요도를 확인하고 찾기를 누르면 후보 목록을 교체해. 기준을 바꾼 뒤 다시 찾으면 전체 분석 범위에서 새로 골라. 중요도 재계산은 현재 후보 목록만 비교해.</p>
+            <button id="generate-candidates" type="submit" disabled>조건 확인하고 분석 지점 찾기</button>
+          </fieldset></form><p id="generation-summary" class="hint" role="status" aria-live="polite"></p>
+        </details>
+        <div id="map" role="region" aria-label="후보 위치 지도"><div id="map-message">지도를 불러오는 중이야. 좌표로도 후보를 추가할 수 있어.</div></div>
+        <div class="map-toolbar"><button id="map-add" type="button" aria-pressed="false" disabled>지도에서 후보 추가</button><span>숫자: 후보 · 갈색 원: 상가 · 파란 사각: 정류장</span></div>
+        <form id="candidate-form"><fieldset id="candidate-fields"><div class="coordinate-form"><label>이름<input id="candidate-name" maxlength="40" placeholder="후보 이름" required></label><label>위도<input id="latitude" type="number" step="any" min="-90" max="90" placeholder="35.18" required></label><label>경도<input id="longitude" type="number" step="any" min="-180" max="180" placeholder="128.10" required></label><button type="submit">추가</button></div></fieldset></form>
+        <ol id="candidates" class="candidate-list"></ol><button id="compare" class="primary wide" type="button" disabled>내 기준으로 비교하기</button>
+      </section>
+      <section id="results" class="panel" hidden><div class="section-heading"><h2><span class="step">03</span> 내 조건과의 적합도</h2><span id="result-tag" class="tag"></span></div><p id="result-summary"></p><div id="result-cards" class="result-grid"></div><p class="hint">적합도는 네가 정한 거리 기준에 선형으로 반영한 값이야. 주거지의 객관적인 품질이나 추천 확률을 뜻하지 않아.</p></section>
+      <section id="safety-panel" class="panel" hidden><h2>안전·환경 · 등록 자료와 지역 근거</h2>
+        <p>CCTV 등록 정보와 공식 게시글을 참고해. 안전도·재해 확률·집 안 소음이나 공기질을 확정하는 자료는 아니야.</p>
+        <div id="safety-reference"></div><div id="safety-research-result"></div>
+        <p id="safety-status" class="hint" role="status" aria-live="polite"></p><button id="safety-cancel" type="button" hidden>보완 조사 취소</button>
+      </section>
+      <section id="housing-panel" class="panel">
+        <h2>집·비용 · 과거 거래 참고</h2>
+        <p class="hint">집마다 가격 편차가 커서 이번 가격 자료는 적합도와 지점 선별에 반영하지 않아. 실제 매물을 추천하거나 예산 충족 여부를 판단하지 않아.</p>
+        <p id="housing-data-note" class="hint"></p>
+        <form id="housing-form"><fieldset id="housing-fields" disabled>
+          <div class="pair"><label>거래 방식<select id="housing-tenure"><option value="sale">아파트 매매</option><option value="jeonse">아파트 전세</option><option value="monthly">아파트 월세</option></select></label><label>조회 지역 · 법정동 주소<select id="housing-area"><option value="">진주시 전체</option></select></label></div>
+          <div class="pair"><label>전용면적 최소 (㎡)<input id="housing-area-min" type="number" min="0" max="999" step="any" value="0" required></label><label>전용면적 최대 미만 (㎡)<input id="housing-area-max" type="number" min="0.1" max="1000" step="any" value="1000" required></label></div>
+          <label>임대 계약 구분<select id="housing-contract" disabled><option value="all">전체</option><option value="new">신규</option><option value="renewal">갱신</option></select></label>
+          <button id="housing-query" type="submit">이 범위의 과거 거래 보기</button>
+        </fieldset></form>
+        <p id="housing-filter-status" class="hint" role="status"></p><div id="housing-reference" aria-live="polite"></div>
+        <details><summary>자료 해석과 범위</summary><div id="housing-limitations"></div></details>
+        <a href="https://rt.molit.go.kr/pt/xls/xls.do?mobileAt=" target="_blank" rel="noopener noreferrer">국토교통부 원본 자료제공</a>
+      </section>
+      <section id="leisure-panel" class="panel" hidden><h2>여가·관계 · 사설 시설 보완</h2>
+        <p class="hint">사업자 안내와 일부 이용자의 경험을 구분해. 발견한 시설은 전체 목록이 아니며 작성일이 없는 소개는 최신 이용 근거로 채택하지 않아.</p>
+        <div id="leisure-research-result"></div><p id="leisure-status" class="hint" role="status" aria-live="polite"></p><button id="leisure-cancel" type="button" hidden>취미 보완 조사 취소</button>
+      </section>
+      <section id="reviews-panel" class="panel" hidden>
+        <h2><span class="step">04</span> 사람들은 어떻게 느꼈을까?</h2>
+        <p>규모와 품목, 만족하거나 아쉬웠던 경험을 웹 보완 조사에서 찾아볼게.</p>
+        <p class="hint">현재 티스토리의 공개 방문 후기를 조사해. 짧은 인용과 AI 요약을 구분하며, 지점과 작성 시점은 원문에서 함께 확인해 줘. 일부 후기는 대표 평판이 아니야.</p>
+        <div id="review-facilities" class="review-grid"></div>
+        <div class="review-actions"><button id="reviews-search" type="button">선택한 매장 후기 조사</button><button id="reviews-cancel" type="button" hidden>조사 취소</button></div>
+        <p id="reviews-status" class="hint" role="status" aria-live="polite"></p>
+      </section>
+      <section class="source-note"><h2>이번 비교에서 알 수 있는 것</h2><p id="data-note"></p><p id="transport-data-note"></p><p>자료에 등록된 시설·정류장까지의 <strong>직선거리</strong>를 계산해. 실제 보행 경로·시간, 버스 노선·방향·배차·현재 운행, 신선식품 재고는 미확인이야. 병원·통근시간 등 다른 조건은 니즈로 보존하고 확인되지 않은 비중을 표시해.</p><a href="https://www.data.go.kr/data/15083033/fileData.do" target="_blank" rel="noopener noreferrer">상가(상권)정보 원본</a> · <a href="https://www.data.go.kr/data/15067528/fileData.do" target="_blank" rel="noopener noreferrer">전국 버스정류장 위치정보 원본</a></section>
+    </div>
+  </div>
+</main><footer>살자리 · 진주 생활권 비교 시제품<span>입력은 서버 메모리에만 보관돼. 1시간 미사용 시 연결이 만료돼.</span></footer>
+</body></html>
