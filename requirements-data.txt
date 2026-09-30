@@ -1,0 +1,4 @@
+# Optional preprocessing only. The application does not import these packages.
+pyshp==3.1.6
+pyproj==3.7.2
+certifi==2026.7.22

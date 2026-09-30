@@ -14,6 +14,7 @@ from pydantic import Field
 
 from .codex_runner import CodexRunner, RunnerError
 from .contracts import Candidate, Contract, InterviewTurn, NeedProfile, Weight, digest
+from .candidates import CandidatePool, GenerationInput
 from .intake import prepare_profile
 from .reviews import ReviewInput, map_links, research_reviews
 from .modules.living import LivingModule, ShopIndex
@@ -76,8 +77,9 @@ def quick_profile(data: QuickInput):
 
 
 class AppState:
-    def __init__(self, index, runner_factory=CodexRunner, stop_index=None):
+    def __init__(self, index, runner_factory=CodexRunner, stop_index=None, candidate_pool=None):
         self.index, self.runner_factory = index, runner_factory
+        self.candidate_pool = candidate_pool
         self.stop_index = stop_index if stop_index is not None else StopIndex({"generated_at": "unavailable", "records": []})
         self.orchestrator = Orchestrator({"living": LivingModule(index), "transport": TransportModule(self.stop_index)})
         self.lock, self.sessions = Lock(), {}
@@ -247,6 +249,7 @@ def make_handler(state, env_path):
                 path = urlsplit(self.path).path
                 files = {"/": (STATIC / "index.html", "text/html; charset=utf-8"),
                          "/app.js": (STATIC / "app.js", "text/javascript; charset=utf-8"),
+                         "/candidates.js": (STATIC / "candidates.js", "text/javascript; charset=utf-8"),
                          "/reviews.js": (STATIC / "reviews.js", "text/javascript; charset=utf-8"),
                          "/transport.js": (STATIC / "transport.js", "text/javascript; charset=utf-8"),
                          "/style.css": (STATIC / "style.css", "text/css; charset=utf-8"),
@@ -265,7 +268,9 @@ def make_handler(state, env_path):
                     return self.send(200, {"javascriptKey": sdk_key(env_path)})
                 if path == "/api/bootstrap":
                     token, _ = state.session()
-                    return self.send(200, {"token": token, "data": {**state.index.metadata(), "transport": state.stop_index.metadata()}})
+                    return self.send(200, {"token": token, "data": {**state.index.metadata(),
+                        "transport": state.stop_index.metadata(), "candidate_generation": state.candidate_pool.metadata()
+                        if state.candidate_pool else {"available": False}}})
                 if path.startswith("/api/jobs/"):
                     _, session = state.session(self.headers.get("X-Session", ""))
                     with state.lock:
@@ -294,6 +299,12 @@ def make_handler(state, env_path):
                     return self.send(200, {"profile": quick_profile(QuickInput.model_validate(data)).model_dump()})
                 if path == "/api/transport-profile":
                     return self.send(200, {"profile": transport_profile(TransportInput.model_validate(data)).model_dump()})
+                if path == "/api/candidates":
+                    request = GenerationInput.model_validate(data)
+                    if not state.candidate_pool:
+                        return self.send(200, {"status": "unavailable", "candidates": [],
+                            "reason": "경계와 분석 지점 자료를 준비해야 자동으로 찾을 수 있어. 지도에서 직접 후보를 골라 줘."})
+                    return self.send(200, state.candidate_pool.generate(request, state.orchestrator))
                 if path == "/api/intake":
                     return self.send(202, state.intake(session, IntakeInput.model_validate(data)))
                 if path == "/api/reviews":
@@ -329,10 +340,17 @@ def main():
     parser.add_argument("--port", type=int, default=5173)
     parser.add_argument("--inventory", type=Path, default=ROOT / "data/processed/inventory.json")
     parser.add_argument("--env-file", type=Path, default=ROOT / ".env")
+    parser.add_argument("--candidate-pool", type=Path, default=ROOT / "data/processed/candidate-pool.json")
+    parser.add_argument("--boundary", type=Path, default=ROOT / "data/reference/jinju-boundary-2025.geojson")
     args = parser.parse_args()
     sdk_key(args.env_file)
     document = json.loads(args.inventory.read_text(encoding="utf-8"))
-    state = AppState(ShopIndex(document), stop_index=StopIndex(document))
+    pool = None
+    try:
+        pool = CandidatePool.load(args.candidate_pool, args.boundary, args.inventory)
+    except (OSError, ValueError, KeyError, TypeError):
+        print("Candidate generation unavailable: prepare matching boundary/inventory/pool files.", flush=True)
+    state = AppState(ShopIndex(document), stop_index=StopIndex(document), candidate_pool=pool)
     server = ThreadingHTTPServer((args.host, args.port), make_handler(state, args.env_file))
     server.daemon_threads = True
     print(f"Saljari M1/M2: http://localhost:{args.port} (bind {args.host})", flush=True)

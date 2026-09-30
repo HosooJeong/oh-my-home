@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ko">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>살자리 · 나에게 맞는 동네 찾기</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script><script src="/transport.js" defer></script><script src="/reviews.js" defer></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>살자리 · 나에게 맞는 동네 찾기</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script><script src="/transport.js" defer></script><script src="/reviews.js" defer></script><script src="/candidates.js" defer></script></head>
 <body>
 <header><a class="brand" href="/">살자리<span>나에게 맞는 동네 찾기</span></a><a class="quiet-link" href="/samples">자료 지도 보기</a></header>
 <main>
@@ -44,6 +44,15 @@
     <div class="content">
       <section class="panel map-panel"><div class="section-heading"><h2><span class="step">02</span> 비교할 위치</h2><button id="demo" class="subtle" type="button">예시 위치 3곳</button></div>
         <p class="hint">진주에서 2~6곳을 골라 줘. 예시 위치는 사용법을 위한 좌표이며 주택 추천이 아니야.</p>
+        <details id="generation-editor" open><summary>내 조건으로 분석 지점 찾기</summary>
+          <p id="generation-data-note" class="hint"></p><a class="external-link" href="https://www.data.go.kr/data/15129688/fileData.do" target="_blank" rel="noopener noreferrer">행정경계 자료 출처</a>
+          <form id="generation-form"><fieldset id="generation-fields">
+            <label for="generation-area">찾을 지역</label><select id="generation-area"><option value="">진주 전체의 준비된 분석 지점</option></select>
+            <div class="pair"><label for="generation-count">찾을 지점 수<select id="generation-count"><option value="2">2곳</option><option value="3" selected>3곳</option><option value="4">4곳</option><option value="5">5곳</option><option value="6">6곳</option></select></label><label for="generation-separation">후보 사이 최소 거리 (m)<input id="generation-separation" type="number" min="0" max="5000" step="any" value="1000" required></label></div>
+            <p class="hint">현재 거리 기준과 중요도를 확인하고 찾기를 누르면 후보 목록을 교체해. 기준을 바꾼 뒤 다시 찾으면 전체 분석 범위에서 새로 골라. 중요도 재계산은 현재 후보 목록만 비교해.</p>
+            <button id="generate-candidates" type="submit" disabled>조건 확인하고 분석 지점 찾기</button>
+          </fieldset></form><p id="generation-summary" class="hint" role="status" aria-live="polite"></p>
+        </details>
         <div id="map" role="region" aria-label="후보 위치 지도"><div id="map-message">지도를 불러오는 중이야. 좌표로도 후보를 추가할 수 있어.</div></div>
         <div class="map-toolbar"><button id="map-add" type="button" aria-pressed="false" disabled>지도에서 후보 추가</button><span>숫자: 후보 · 갈색 원: 상가 · 파란 사각: 정류장</span></div>
         <form id="candidate-form"><fieldset id="candidate-fields"><div class="coordinate-form"><label>이름<input id="candidate-name" maxlength="40" placeholder="후보 이름" required></label><label>위도<input id="latitude" type="number" step="any" min="-90" max="90" placeholder="35.18" required></label><label>경도<input id="longitude" type="number" step="any" min="-180" max="180" placeholder="128.10" required></label><button type="submit">추가</button></div></fieldset></form>
