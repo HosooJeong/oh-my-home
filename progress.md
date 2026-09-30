@@ -11,3 +11,10 @@ Original prompt: 좋아 재밌어보여. 시작해보자 — Three.js 중앙 집
 - 수정: findBlock의 지역변수 hit가 함수 hit를 가려 입력 오류 발생→intersection으로 수정/재확인. 모바일 column flex 높이 축소→flex:none 적용/확인. 수정 후 새 콘솔 오류/경고0.
 - 한계: 주소는 메모, 단독/집값 단독 결과·실제 모듈 상태/결과 새 UI·기타 조건 후속. 신규 서비스 LLM 호출/전체회귀/실휴대폰·성능·3D 실패 재현 미실행.
 - 증거: 상위 work/saljari-evidence/20261001/village01-*; canonical records remain in AIcontest/docs/project-records.
+
+## VILLAGE02 — 2026-10-01 모델 정교화
+- 요청: 실제 레고블록 느낌의 세부 모델. village-models.mjs에 둥근 모서리·돌기/벽돌/지붕/창·각 분야 소품·조립식 나무/작은 사람, 플라스틱/로컬 조명·부품 인스턴싱 추가.
+- 새 모델 높이 라벨과 확대2.8, 기존 선호/질문 계약 유지. 외부 모델/브랜드 자산·신규 라이브러리 없음.
+- geometry smoke8조립 객체의 유한 경계/CPU ray 교차 통과, JS/Python 문법·새 경로HTTP200. 실제6모델 확대·새 인스턴스 선택/드래그 교육2→1·21→25%/회전 불변·390px 가로 넘침0·새 콘솔0.
+- 사용자 최소 QA/현재 CUA 규칙을 따라 핵심 검증만 실행. 선호 단위시험/전체회귀·서비스 LLM/실휴대폰/정량 FPS 반복 없음.
+- 서버: 이전10652 확인 후 재시작,9420/0.0.0.0:5173 유지. 증거는 상위 work/saljari-evidence/20261001/village02-*.

@@ -361,6 +361,7 @@ def make_handler(state, env_path):
                          "/village.css": (STATIC / "village.css", "text/css; charset=utf-8"),
                          "/village.mjs": (STATIC / "village.mjs", "text/javascript; charset=utf-8"),
                          "/village-model.mjs": (STATIC / "village-model.mjs", "text/javascript; charset=utf-8"),
+                         "/village-models.mjs": (STATIC / "village-models.mjs", "text/javascript; charset=utf-8"),
                          "/vendor/three/three.module.min.js": (STATIC / "vendor/three/three.module.min.js", "text/javascript; charset=utf-8"),
                          "/vendor/three/three.core.min.js": (STATIC / "vendor/three/three.core.min.js", "text/javascript; charset=utf-8"),
                          "/app.js": (STATIC / "app.js", "text/javascript; charset=utf-8"),

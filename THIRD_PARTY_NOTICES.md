@@ -30,4 +30,4 @@ Package: https://www.npmjs.com/package/three/v/0.180.0
 | three.core.min.js | 61ba0df005b05991361d040d8ff670e1aadfd0ce7aeebd1fdb0725957a8957de |
 | LICENSE | bfe119ea4fd413f5f7ca3fcd63adb0c4a073ed39daa2fe7d3e6b769e21272601 |
 
-The house, buildings, trees, benches, bus and people are newly written procedural geometry in `village.mjs`. No branded LEGO asset, logo, downloaded model or generated bitmap is included. The town represents priorities, not actual facilities or geographic coordinates.
+The house, buildings, trees, benches, bus and people are newly written procedural geometry in `village-models.mjs`, composed by `village.mjs`. The small studio environment map is generated locally in code. No branded LEGO asset, logo, downloaded model or generated bitmap is included. The town represents priorities, not actual facilities or geographic coordinates.
