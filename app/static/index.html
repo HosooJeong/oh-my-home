@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ko">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>살자리 · 나에게 맞는 동네 찾기</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script><script src="/transport.js" defer></script><script src="/reviews.js" defer></script><script src="/candidates.js" defer></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>살자리 · 나에게 맞는 동네 찾기</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script><script src="/transport.js" defer></script><script src="/reviews.js" defer></script><script src="/candidates.js" defer></script><script src="/housing.js" defer></script></head>
 <body>
 <header><a class="brand" href="/">살자리<span>나에게 맞는 동네 찾기</span></a><a class="quiet-link" href="/samples">자료 지도 보기</a></header>
 <main>
@@ -59,6 +59,20 @@
         <ol id="candidates" class="candidate-list"></ol><button id="compare" class="primary wide" type="button" disabled>내 기준으로 비교하기</button>
       </section>
       <section id="results" class="panel" hidden><div class="section-heading"><h2><span class="step">03</span> 내 조건과의 적합도</h2><span id="result-tag" class="tag"></span></div><p id="result-summary"></p><div id="result-cards" class="result-grid"></div><p class="hint">적합도는 네가 정한 거리 기준에 선형으로 반영한 값이야. 주거지의 객관적인 품질이나 추천 확률을 뜻하지 않아.</p></section>
+      <section id="housing-panel" class="panel">
+        <h2>집·비용 · 과거 거래 참고</h2>
+        <p class="hint">집마다 가격 편차가 커서 이번 가격 자료는 적합도와 지점 선별에 반영하지 않아. 실제 매물을 추천하거나 예산 충족 여부를 판단하지 않아.</p>
+        <p id="housing-data-note" class="hint"></p>
+        <form id="housing-form"><fieldset id="housing-fields" disabled>
+          <div class="pair"><label>거래 방식<select id="housing-tenure"><option value="sale">아파트 매매</option><option value="jeonse">아파트 전세</option><option value="monthly">아파트 월세</option></select></label><label>조회 지역 · 법정동 주소<select id="housing-area"><option value="">진주시 전체</option></select></label></div>
+          <div class="pair"><label>전용면적 최소 (㎡)<input id="housing-area-min" type="number" min="0" max="999" step="any" value="0" required></label><label>전용면적 최대 미만 (㎡)<input id="housing-area-max" type="number" min="0.1" max="1000" step="any" value="1000" required></label></div>
+          <label>임대 계약 구분<select id="housing-contract" disabled><option value="all">전체</option><option value="new">신규</option><option value="renewal">갱신</option></select></label>
+          <button id="housing-query" type="submit">이 범위의 과거 거래 보기</button>
+        </fieldset></form>
+        <p id="housing-filter-status" class="hint" role="status"></p><div id="housing-reference" aria-live="polite"></div>
+        <details><summary>자료 해석과 범위</summary><div id="housing-limitations"></div></details>
+        <a href="https://rt.molit.go.kr/pt/xls/xls.do?mobileAt=" target="_blank" rel="noopener noreferrer">국토교통부 원본 자료제공</a>
+      </section>
       <section id="reviews-panel" class="panel" hidden>
         <h2><span class="step">04</span> 사람들은 어떻게 느꼈을까?</h2>
         <p>규모와 품목, 만족하거나 아쉬웠던 경험을 공개 후기에서 찾아볼게.</p>

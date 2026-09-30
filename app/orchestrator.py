@@ -1,10 +1,10 @@
 """One controller dispatches category modules and validates every returned fact."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from threading import Event
 from typing import Protocol
 from uuid import uuid4
 
-from .contracts import Candidate, CategoryResult, CriterionWeight, ModuleRequest, NeedProfile, digest
+from .contracts import Candidate, CategoryResult, CriterionWeight, ModuleRequest, NeedProfile, ReferenceResult, digest
 from .evaluation import evaluate, weights
 
 
@@ -18,10 +18,13 @@ class CategoryModule(Protocol):
 @dataclass
 class Orchestrator:
     modules: dict[str, CategoryModule]
+    reference_modules: dict = field(default_factory=dict)
 
     def __post_init__(self):
         if any(key != module.id for key, module in self.modules.items()):
             raise ValueError("registry key and module id differ")
+        if any(key != module.id for key, module in self.reference_modules.items()):
+            raise ValueError("reference registry key and module id differ")
 
     def run(self, profile: NeedProfile, candidates: list[Candidate], cancel: Event | None = None) -> dict:
         profile = NeedProfile.model_validate(profile.model_dump())
@@ -75,6 +78,21 @@ class Orchestrator:
         if cancel.is_set():
             return {**identity, "run_id": run_id, "status": "cancelled", "events": events,
                     "report": None, "modules": results, "questions": []}
+        references = []
+        for module_id, module in self.reference_modules.items():
+            try:
+                reference = ReferenceResult.model_validate(module.run_reference(
+                    profile.model_copy(deep=True), [c.model_copy(deep=True) for c in candidates], cancel).model_dump())
+                if (reference.module_id != module_id or reference.profile_fingerprint != identity["profile_fingerprint"]
+                        or reference.candidates_fingerprint != identity["candidates_fingerprint"]):
+                    raise ValueError("stale reference")
+                references.append(reference.model_dump())
+                events.append({"stage": "reference_finished", "module_id": module_id, "status": reference.status})
+            except Exception:
+                events.append({"stage": "reference_failed", "module_id": module_id})
+        if cancel.is_set():
+            return {**identity, "run_id": run_id, "status": "cancelled", "events": events,
+                    "report": None, "modules": results, "references": references, "questions": []}
         report = evaluate(profile, candidates, all_evidence)
         questions = [q for r in results for q in r["questions"]]
         if any(q["blocking"] for q in questions):
@@ -85,7 +103,7 @@ class Orchestrator:
         events.append({"stage": "evaluated"})
         status = "awaiting_input" if any(q["blocking"] for q in questions) else "partial" if partial else "completed"
         return {**identity, "run_id": run_id, "status": status,
-                "events": events, "report": report, "modules": results, "questions": questions}
+                "events": events, "report": report, "modules": results, "references": references, "questions": questions}
 
     @staticmethod
     def _check_result(request, result, previous_ids):

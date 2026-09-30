@@ -188,6 +188,63 @@ class CategoryResult(Contract):
     error_code: str | None
 
 
+class ReferenceDistribution(Contract):
+    label: Text
+    unit: Text
+    count: Annotated[int, Field(ge=0)]
+    minimum: Number | None
+    q25: Number | None
+    median: Number | None
+    q75: Number | None
+    maximum: Number | None
+
+    @model_validator(mode="after")
+    def ordered(self):
+        values = [self.minimum, self.q25, self.median, self.q75, self.maximum]
+        if any(v is None for v in values):
+            if any(v is not None for v in values):
+                raise ValueError("partial distribution")
+        elif values != sorted(values) or self.count < 5:
+            raise ValueError("invalid or undersized distribution")
+        return self
+
+
+class ReferenceResult(Contract):
+    """Informational category output: never score evidence or a hard-condition verdict."""
+    module_id: Identifier
+    module_version: Text
+    profile_fingerprint: str | None
+    candidates_fingerprint: str | None
+    status: Literal["available", "insufficient", "empty", "unavailable"]
+    query_fingerprint: str
+    scope: Text
+    sample_count: Annotated[int, Field(ge=0)]
+    distributions: list[ReferenceDistribution]
+    contract_counts: dict[str, Annotated[int, Field(ge=0)]]
+    source_url: SourceURL
+    period_start: str | None
+    period_end: str | None
+    retrieved_at: str | None
+    snapshot_fingerprint: str | None
+    limitations: list[Text]
+
+    @model_validator(mode="after")
+    def consistent(self):
+        if any(d.count != self.sample_count for d in self.distributions) or sum(self.contract_counts.values()) != self.sample_count:
+            raise ValueError("reference sample counts differ")
+        if self.status == "available" and (self.sample_count < 5 or not self.distributions
+                or any(d.median is None for d in self.distributions)):
+            raise ValueError("reference summary is unavailable")
+        if self.status == "insufficient" and (not 0 < self.sample_count < 5
+                or any(d.median is not None for d in self.distributions)):
+            raise ValueError("undersized reference must withhold summaries")
+        if self.status in ("empty", "unavailable") and (self.sample_count or self.distributions):
+            raise ValueError("empty reference has measurements")
+        if self.status != "unavailable" and not all((self.period_start, self.period_end, self.retrieved_at, self.snapshot_fingerprint)):
+            raise ValueError("reference provenance missing")
+        return self
+
+
 def digest(value) -> str:
     return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True,
                                     separators=(",", ":"), allow_nan=False).encode()).hexdigest()
