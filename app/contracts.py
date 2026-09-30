@@ -57,6 +57,14 @@ class MetricParameters(TypedDict, total=False):
     school_id: Annotated[str, Field(max_length=200)] | None
     subject: Annotated[str, Field(max_length=200)] | None
     radius_m: Annotated[str, Field(max_length=200)] | None
+    park_type: Annotated[str, Field(max_length=200)] | None
+    library_type: Annotated[str, Field(max_length=200)] | None
+    activity: Annotated[str, Field(max_length=200)] | None
+    activity_form: Annotated[str, Field(max_length=200)] | None
+    activity_name: Annotated[str, Field(max_length=200)] | None
+    meeting_label: Annotated[str, Field(max_length=200)] | None
+    meeting_latitude: Annotated[str, Field(max_length=200)] | None
+    meeting_longitude: Annotated[str, Field(max_length=200)] | None
 
 
 class Criterion(Contract):
@@ -175,6 +183,7 @@ class Evidence(Contract):
     unit: Text
     status: Literal["verified", "missing", "conflicting"]
     source_url: SourceURL | None
+    source_kind: Literal['public', 'user'] = 'public'
     source_record: Text | None
     data_date: Text | None
     retrieved_at: Text | None
@@ -184,7 +193,7 @@ class Evidence(Contract):
     @model_validator(mode="after")
     def traceable(self):
         if self.status == "verified" and (
-            self.value is None or not self.source_url or not self.source_record
+            self.value is None or (self.source_kind == 'public' and not self.source_url) or not self.source_record
             or not self.data_date or not self.retrieved_at
         ):
             raise ValueError("verified evidence requires value and provenance")

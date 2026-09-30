@@ -1,10 +1,10 @@
 <!doctype html>
 <html lang="ko">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>살자리 · 나에게 맞는 동네 찾기</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script><script src="/transport.js" defer></script><script src="/reviews.js" defer></script><script src="/candidates.js" defer></script><script src="/housing.js" defer></script><script src="/education.js" defer></script><script src="/safety.js" defer></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>살자리 · 나에게 맞는 동네 찾기</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script><script src="/transport.js" defer></script><script src="/reviews.js" defer></script><script src="/candidates.js" defer></script><script src="/housing.js" defer></script><script src="/education.js" defer></script><script src="/safety.js" defer></script><script src="/leisure.js" defer></script></head>
 <body>
 <header><a class="brand" href="/">살자리<span>나에게 맞는 동네 찾기</span></a><a class="quiet-link" href="/samples">자료 지도 보기</a></header>
 <main>
-  <section class="intro"><p class="eyebrow">생활과 교통 · 내 기준으로 비교</p><h1>어떤 생활을<br>담을 곳이 필요해?</h1><p>원하는 생활을 적고, 지도에서 후보를 골라 봐.<br>같은 동네도 네 기준에 따라 다르게 비교할 수 있어.</p></section>
+  <section class="intro"><p class="eyebrow">생활권 · 내 기준으로 비교</p><h1>어떤 생활을<br>담을 곳이 필요해?</h1><p>원하는 생활을 적고, 지도에서 후보를 골라 봐.<br>같은 동네도 네 기준에 따라 다르게 비교할 수 있어.</p></section>
   <div id="status" class="status" role="status" aria-live="polite">자료를 불러오는 중이야.</div>
   <div class="workspace">
     <div class="sidebar">
@@ -50,6 +50,27 @@
           <p class="hint">숫자는 적용 전 제안값이야. CCTV 등록 지점은 참고이며 안전 점수가 아니야. 문제별 근거가 부족하면 중요도를 유지하고 전체 순위를 보류해. 서로 다른 조건의 중요도는 아래에서 따로 바꿀 수 있어.</p>
           <label class="check"><input id="safety-research" type="checkbox">후보 지역의 최신 공식 웹자료로 선택한 문제 보완</label>
           <button type="submit">안전·환경 조건 적용</button>
+        </fieldset></form>
+      </section>
+      <section class="panel"><h2>여가·관계 조건</h2><p id="leisure-data-note" class="hint"></p>
+        <form id="leisure-form"><fieldset id="leisure-fields">
+          <label class="check"><input id="include-park" type="checkbox">공원 접근성</label>
+          <label>공원 유형<select id="park-type"><option value="any">전체 도시공원</option><option value="children">어린이공원</option><option value="neighborhood">근린공원</option></select></label>
+          <label class="check"><input id="include-library" type="checkbox">도서관 접근성</label>
+          <label>도서관 유형<select id="library-type"><option value="any">공공·작은도서관</option><option value="public">공공도서관</option><option value="small">작은도서관</option></select></label>
+          <div class="pair"><label>이상적 직선거리 (m)<input id="leisure-ideal" type="number" min="0" max="20000" step="any" value="500" required></label><label>만족도 0 거리 (m)<input id="leisure-limit" type="number" min="1" max="50000" step="any" value="1500" required></label></div>
+          <div class="pair"><label>공원 중요도<input id="park-importance" type="number" min="0" max="100" value="40" required></label><label>도서관 중요도<input id="library-importance" type="number" min="0" max="100" value="20" required></label></div>
+          <label class="check"><input id="include-meeting" type="checkbox">지정 만남 지점까지 거리</label>
+          <label>만남 지점 이름<input id="meeting-label" maxlength="100" placeholder="예: 가족과 만나는 장소"></label>
+          <div class="pair"><label>지점 위도<input id="meeting-lat" type="number" min="-90" max="90" step="any"></label><label>지점 경도<input id="meeting-lon" type="number" min="-180" max="180" step="any"></label></div>
+          <label>만남 지점 중요도<input id="meeting-importance" type="number" min="0" max="100" value="20" required></label>
+          <label class="check"><input id="include-hobby" type="checkbox">사설 취미시설도 찾아보기</label>
+          <label>취미 종목<select id="hobby-activity"><option value="gym">헬스</option><option value="pilates">필라테스</option><option value="table_tennis">탁구</option><option value="swimming">수영</option><option value="tennis">테니스</option><option value="yoga">요가</option><option value="other">다른 취미 직접 입력</option></select></label>
+          <label>직접 입력할 취미<input id="hobby-name" maxlength="100" placeholder="예: 배드민턴, 클라이밍"></label>
+          <label>원하는 이용 형태<input id="hobby-form" maxlength="100" placeholder="예: 기구 필라테스 소그룹, 탁구 자유 이용"></label>
+          <div class="pair"><label>취미 중요도<input id="hobby-importance" type="number" min="0" max="100" value="20" required></label><label>여가 분야 중요도<input id="leisure-weight" type="number" min="0" max="100" value="30" required></label></div>
+          <p class="hint">숫자는 적용 전 제안값이야. 공원·도서관·만남은 직선거리로 비교하고, 취미시설의 이용 형태·경험은 웹으로 보완해. 미확인 조건의 중요도는 유지해.</p>
+          <button type="submit">여가·관계 조건 적용</button>
         </fieldset></form>
       </section>
       <section id="profile-panel" class="panel" hidden><h2>정리한 니즈</h2><div id="context"></div><div id="criteria"></div><form id="interview"><div id="questions"></div><button id="answer" type="submit" hidden>답변 반영</button></form>
@@ -108,6 +129,10 @@
         <p id="housing-filter-status" class="hint" role="status"></p><div id="housing-reference" aria-live="polite"></div>
         <details><summary>자료 해석과 범위</summary><div id="housing-limitations"></div></details>
         <a href="https://rt.molit.go.kr/pt/xls/xls.do?mobileAt=" target="_blank" rel="noopener noreferrer">국토교통부 원본 자료제공</a>
+      </section>
+      <section id="leisure-panel" class="panel" hidden><h2>여가·관계 · 사설 시설 보완</h2>
+        <p class="hint">사업자 안내와 일부 이용자의 경험을 구분해. 발견한 시설은 전체 목록이 아니며 작성일이 없는 소개는 최신 이용 근거로 채택하지 않아.</p>
+        <div id="leisure-research-result"></div><p id="leisure-status" class="hint" role="status" aria-live="polite"></p><button id="leisure-cancel" type="button" hidden>취미 보완 조사 취소</button>
       </section>
       <section id="reviews-panel" class="panel" hidden>
         <h2><span class="step">04</span> 사람들은 어떻게 느꼈을까?</h2>

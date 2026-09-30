@@ -2,7 +2,9 @@
 
 메인 오케스트레이터 → 카테고리 모듈 → 메인 통합을 위한 Python 코어다. 후속 M1에서 실제 생활 데이터와 제품 입력 화면을 연결했다. [실행 안내](../README.md), [생활 모듈 규격](modules/README.md)을 따른다. `examples/p0_demo.py`의 모듈은 계산/통합 설명용 가상 자료이며 실제 주거 추천이 아니다.
 
-M4는 [학교급/과목별 교육 조회](../docs/education-accessibility.md)를 `education`으로 연결한다. `parameters`에 학교급·과목·반경을 보존하고 개인 조건의 단위/포화 기준으로 평가한다. `web.AppState`가 공식 근거 통합 뒤 필요한 시설의 조건부 LLM 직접 검색을 시작하며 결과는 정량 평가와 분리한다. 공통 [최신성·원문 수용 정책](../docs/research-policy.md)은 M1/M4에 적용된다. 다른 분야의 전용 보완 조사는 후속이다.
+M4는 [학교급/과목별 교육 조회](../docs/education-accessibility.md)를 `education`으로 연결한다. `parameters`에 학교급·과목·반경을 보존하고 개인 조건의 단위/포화 기준으로 평가한다. `web.AppState`가 공식 근거 통합 뒤 필요한 시설의 조건부 LLM 직접 검색을 시작하며 결과는 정량 평가와 분리한다. 공통 [최신성·원문 수용 정책](../docs/research-policy.md)을 M1/M4/M5/M6에 적용하고 분야별 원문 검사를 추가한다.
+
+M6 `leisure`는 [공원/도서관·사용자 지정 지점의 거리](../docs/leisure-accessibility.md)를 비교한다. `hobby_suitability`의 중요도/종목·이용 형태는 보존하고 점수 미지원으로 남긴다. 요청된 사설 취미 후보의 직접 웹검색은 메인 보완 작업으로 실행해 원문·날짜·지점/주소·종목을 검사하고 점수와 분리한다. 사용자 지점은 `Evidence.source_kind=user`로 구분하며 가짜 외부 URL을 만들지 않는다. 공공 근거의 출처 검증과 재가중치의 근거 재사용은 유지한다.
 
 ## 실행
 

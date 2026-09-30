@@ -130,6 +130,10 @@ class Orchestrator:
                 raise ValueError("duplicate evidence")
             if e.criterion_id in result.unsupported_criterion_ids:
                 raise ValueError("unsupported criterion has evidence")
+            if e.source_kind == 'user' and not (request.module_id == 'leisure'
+                    and criteria[e.criterion_id].metric == 'meeting_straight_line_distance_m'
+                    and criteria[e.criterion_id].source == 'user' and e.source_url is None):
+                raise ValueError('invalid user supplied provenance')
             rule = criteria[e.criterion_id].utility
             if e.status == "verified" and rule and rule.direction == "boolean" and e.value not in (0, 1):
                 raise ValueError("invalid boolean metric")

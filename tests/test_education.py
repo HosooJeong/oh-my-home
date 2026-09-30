@@ -95,7 +95,7 @@ class EducationTests(unittest.TestCase):
     def test_strict_model_schema_keeps_scope_fields_and_drops_nulls(self):
         schema=output_schema(NeedProfile)
         params=schema['$defs']['MetricParameters']
-        self.assertEqual(set(params['properties']),{'school_level','school_id','subject','radius_m'})
+        self.assertTrue({'school_level','school_id','subject','radius_m'} <= set(params['properties']))
         self.assertFalse(params['additionalProperties'])
         p=education_profile(settings())
         c=Criterion.model_validate(p.criteria[0].model_dump() | {'parameters':{'school_level':'elementary','subject':None}})

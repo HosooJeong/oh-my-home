@@ -1,0 +1,32 @@
+{
+  "version": "m6-1",
+  "retrieved_at": "2026-09-30T22:01:49.849862+09:00",
+  "excluded": {},
+  "sources": [
+    {
+      "id": "parks",
+      "source_url": "https://www.data.go.kr/data/15012890/standard.do",
+      "filename": "parks.json",
+      "rows": 18295,
+      "bytes": 10508296,
+      "sha256": "3071714de545ba71f47416f78776fd642a7199eaf3108e6db4294a4c9161658f"
+    },
+    {
+      "id": "libraries",
+      "source_url": "https://www.data.go.kr/data/15013109/standard.do",
+      "filename": "libraries.json",
+      "rows": 3601,
+      "bytes": 3176546,
+      "sha256": "7eecacef8d95bdb98bd849488bfc7992927ba178d69f667d3c3451d6b5cd857c"
+    }
+  ],
+  "counts": {
+    "park": 182,
+    "library": 74
+  },
+  "data_dates": [
+    "2025-07-31",
+    "2026-07-01",
+    "2026-07-08"
+  ]
+}

@@ -1,5 +1,6 @@
 """Natural-language request + optional interview -> editable needs and priorities."""
 import json
+import re
 from .codex_runner import CodexRunner, RunnerError
 from .contracts import InterviewTurn, NeedProfile
 
@@ -51,8 +52,24 @@ night,traffic,flood,noise,air 중 명시된 문제의 코드만 쉼표로 연결
 CCTV 참고 요청은 safety_reference=requested로 보존한다. 반경을 명시하면 safety_radius_m에 m 숫자를 문자열로 보존한다.
 반경은 CCTV 참고 범위이며 안전도 목표가 아니다. 가격처럼 참고 요청 자체는 점수 조건으로 만들지 마라.
 안전 보완 요청을 상가 후기 요청인 qualitative_research_requested로 중복 지정하지 마라.
-parameters의 school_level/school_id/subject/radius_m 중 해당 없는 필드는 null이다.
-다른 분야의 정성 조사 요청은 context qualitative_research_requested=requested로 보존하라.
+여가 module_id=leisure: park_straight_line_distance_m과 library_straight_line_distance_m은 m/lower다.
+공원 parameters.park_type은 any/children/neighborhood, 도서관 parameters.library_type은 any/public/small이다.
+어린이공원 구분은 실제 놀이시설 상태나 반려견 허용을 뜻하지 않는다. 도서관 유형은 입장 자격을 보장하지 않는다.
+meeting_straight_line_distance_m은 사용자가 지점 좌표를 직접 명시했을 때만 사용한다.
+parameters.meeting_label/meeting_latitude/meeting_longitude에 명시된 값만 문자열로 보존한다.
+사용자가 주소만 제공하면 좌표를 추정하지 말고 실제 이동 요구를 미지원 조건으로 보존하라.
+사설 헬스/필라테스/탁구/수영/테니스/요가 니즈는 hobby_suitability, utility=null로 보존한다.
+parameters.activity는 gym/pilates/table_tennis/swimming/tennis/yoga/other, activity_form은 명시된 형태다.
+그 외 취미는 activity=other와 activity_name에 명시한 취미 이름을 보존하라. 불명확하면 질문하라.
+취미 종목·기구/매트·자율/PT·개인/그룹·자유 이용/레슨은 요청에서 명시된 만큼만 보존한다.
+사설 취미 니즈에는 context leisure_research=requested를 넣어 비교 뒤 후보 발굴/보완 검색이 이어지게 하라.
+취미 자체의 평가 중요도는 보존하되 시설 수·거리·품질 점수로 치환하지 마라. 검색 자체에 별도 가중치를 주지 마라.
+취미 지표는 현재 정량 점수 미지원이므로 허구의 만족도 기준이나 직선거리 수치를 질문하지 마라.
+반려동물/이동 제약/동반 규칙/실제 경로는 별도 미지원 조건으로 보존하고 공원 거리로 충족시키지 마라.
+같은 공원/동일 만남 지점의 동일 거리 조건을 중복 생성하지 마라.
+parameters에 해당 없는 필드는 null이다.
+생활 매장 정성 조사 요청은 context qualitative_research_requested=requested로 보존하라.
+여가 취미 조사 요청을 생활 매장 후기 요청으로 중복 지정하지 마라.
 직선거리 목표/만족도 0 기준이 없으면 utility=null로 두고 직선거리 기준을 질문하라.
 장보기 대상이 불명확하면 마트인지 편의점인지 질문하라. 신선식품 재고·영업시간·의료 요구는
 별도의 조건으로 남겨라. 지원하지 않는 요구도 보존하고 자료가 없다고 지어내지 마라.
@@ -105,4 +122,12 @@ def prepare_profile(runner: CodexRunner, request: str, answers: list[InterviewTu
     if any(c.source_quote not in previous_quotes and not any(c.source_quote in text for text in source_texts)
            for c in [*profile.criteria, *profile.context]):
         raise RunnerError("unsupported_source_quote")
+    for criterion in profile.criteria:
+        if criterion.module_id!='leisure' or criterion.metric!='meeting_straight_line_distance_m': continue
+        for key,label in [('meeting_latitude','위도'),('meeting_longitude','경도')]:
+            try:
+                value=float(criterion.parameters[key])
+                explicit=[float(v) for text in source_texts for v in re.findall(label+r'\s*[:=]?\s*([-+]?\d+(?:\.\d+)?)',text)]
+            except (KeyError,ValueError,TypeError): raise RunnerError('unsupported_meeting_coordinates')
+            if value not in explicit: raise RunnerError('unsupported_meeting_coordinates')
     return profile
