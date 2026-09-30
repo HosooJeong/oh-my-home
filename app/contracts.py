@@ -4,7 +4,8 @@ from __future__ import annotations
 import hashlib
 import json
 from typing import Annotated, Literal
-from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, model_validator
+from typing_extensions import TypedDict
+from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, field_validator, model_validator
 
 Number = FiniteFloat
 Weight = Annotated[FiniteFloat, Field(ge=0, le=100)]
@@ -51,6 +52,13 @@ class HardRule(Contract):
     value: Number
 
 
+class MetricParameters(TypedDict, total=False):
+    school_level: Annotated[str, Field(max_length=200)] | None
+    school_id: Annotated[str, Field(max_length=200)] | None
+    subject: Annotated[str, Field(max_length=200)] | None
+    radius_m: Annotated[str, Field(max_length=200)] | None
+
+
 class Criterion(Contract):
     id: Identifier
     group_id: Identifier
@@ -64,6 +72,12 @@ class Criterion(Contract):
     metric: Identifier
     utility: UtilityRule | None
     hard: HardRule | None
+    parameters: MetricParameters = Field(default_factory=dict)
+
+    @field_validator('parameters')
+    @classmethod
+    def supplied_parameters(cls, value):
+        return {key: item for key, item in value.items() if item is not None}
 
     @model_validator(mode="after")
     def explicit_hard(self):

@@ -1,0 +1,49 @@
+{
+  "version": "m4-1",
+  "retrieved_at": "2026-09-30T18:38:28.910825+09:00",
+  "sources": [
+    {
+      "id": "schools",
+      "source_url": "https://www.data.go.kr/data/15021148/standard.do",
+      "filename": "schools.json",
+      "rows": 12011,
+      "bytes": 7884826,
+      "sha256": "9df3b070383c19e8781cc14be596163b9c3ecac8d6643f0826588f0ba9b8f893"
+    },
+    {
+      "id": "academies",
+      "source_url": "https://open.neis.go.kr/portal/data/service/selectServicePage.do?infId=OPEN19220231012134453534385&infSeq=1",
+      "filename": "academies.json",
+      "rows": 1228,
+      "bytes": 958006,
+      "sha256": "a9a7d41b00d1ee59bc3c646c513c01a7858d3679b1708538418e17dd7ce0d613"
+    }
+  ],
+  "coordinate_inventory_sha256": "01e47ac5a036088c1904c02fe3143d1816ff6f315114ad003b80eb06c0f55cc7",
+  "excluded": {
+    "academy_address_coordinate_conflict": 83,
+    "academy_unlocated": 215,
+    "academy_adult_only": 6
+  },
+  "available": true,
+  "counts": {
+    "school": 90,
+    "academy": 1222
+  },
+  "academy_unlocated": 215,
+  "academy_old_or_future": 761,
+  "levels": {
+    "elementary": "초등학교",
+    "middle": "중학교",
+    "high": "고등학교"
+  },
+  "subjects": {
+    "math": "수학",
+    "english": "영어",
+    "korean": "국어",
+    "science": "과학",
+    "art": "미술",
+    "music": "음악"
+  },
+  "limitations": "학교는 공식 위치, 학원은 같은 도로명주소 상가 좌표를 연결한 건물 수준 위치야. 학교 배정·반 크기·보행 경로는 미확인이야."
+}

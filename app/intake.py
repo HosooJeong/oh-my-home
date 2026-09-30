@@ -30,6 +30,18 @@ jeonse(전세), monthly(월세)다. 예산·전용면적·주택유형은 housin
 housing_type에 원문 수준으로 보존하라. 월세와 보증금을 합산/전환하거나 금액 기준을 추정하지 마라.
 실제 집의 예산/방 수/주택 조건을 비교해야 하는 요구는 별도 미지원 criteria로 보존하라.
 지역 대표 가격을 그 요구의 근거로 만들지 마라. 집값을 참고하는 데 거리나 만족도 기준을 묻지 마라.
+교육 module_id=education: school_straight_line_distance_m은 m/lower,
+parameters.school_level은 elementary/middle/high 중 명시된 학교급이다.
+academy_count_within_radius는 count/higher, parameters에 subject(math/english/korean/science/art/music),
+school_level, radius_m(직선반경의 숫자를 문자열로)을 명시한 만큼 넣는다.
+충분한 개소 수는 ideal, 0개소 등 만족도 0 기준은 limit다. 필수 개소 수를 임의로 만들지 마라.
+학교급·과목·직선반경이 없으면 묻거나 미확인으로 남겨라. 학교 배정·실제 반 크기·횡단/안전을
+거리/정원으로 대신하지 마라. 그런 비교 요구는 별도 미지원 조건으로 보존하라.
+education_level, education_subject, school_travel_mode는 명시된 배경을 context에 보존하라.
+학원 수업 형태·규모·후기 등 정성적 보완을 요청하면 education_research=requested를 context에 넣어라.
+그런 서술 요청 자체에 임의 점수나 중요도를 주지 마라. 보완 검색은 비교 후 별도 파이프라인이 수행한다.
+parameters의 school_level/school_id/subject/radius_m 중 해당 없는 필드는 null이다.
+다른 분야의 정성 조사 요청은 context qualitative_research_requested=requested로 보존하라.
 직선거리 목표/만족도 0 기준이 없으면 utility=null로 두고 직선거리 기준을 질문하라.
 장보기 대상이 불명확하면 마트인지 편의점인지 질문하라. 신선식품 재고·영업시간·의료 요구는
 별도의 조건으로 남겨라. 지원하지 않는 요구도 보존하고 자료가 없다고 지어내지 마라.

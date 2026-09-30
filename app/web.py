@@ -20,6 +20,9 @@ from .reviews import ReviewInput, map_links, research_reviews
 from .modules.living import LivingModule, ShopIndex
 from .modules.transport import StopIndex, TransportModule
 from .modules.housing import HousingIndex, HousingModule, HousingQuery
+from .modules.education import EducationIndex, EducationModule
+from .education_preferences import EducationInput, education_profile
+from .geo import distance_m
 from .transport_preferences import TransportInput, transport_profile
 from .orchestrator import Orchestrator
 from .preferences import reevaluate_preferences, update_preferences
@@ -78,13 +81,14 @@ def quick_profile(data: QuickInput):
 
 
 class AppState:
-    def __init__(self, index, runner_factory=CodexRunner, stop_index=None, candidate_pool=None, housing_index=None):
+    def __init__(self, index, runner_factory=CodexRunner, stop_index=None, candidate_pool=None, housing_index=None, education_index=None):
         self.index, self.runner_factory = index, runner_factory
         self.candidate_pool = candidate_pool
         self.stop_index = stop_index if stop_index is not None else StopIndex({"generated_at": "unavailable", "records": []})
         self.housing = HousingModule(housing_index if housing_index is not None else HousingIndex())
+        self.education_index = education_index if education_index is not None else EducationIndex()
         self.orchestrator = Orchestrator({"living": LivingModule(index), "transport": TransportModule(self.stop_index),
-                                        "housing": self.housing}, reference_modules={"housing": self.housing})
+                                        "housing": self.housing, 'education': EducationModule(self.education_index)}, reference_modules={"housing": self.housing})
         self.lock, self.sessions = Lock(), {}
         self.active_job = None
 
@@ -116,7 +120,7 @@ class AppState:
             current = session["comparison"]
             if current is None or current[2]["run_id"] != data.run_id:
                 raise ValueError("stale_comparison")
-            available = {id: f for id, f in self.enrich(current[2])["facilities"].items() if f["kind"] == "shops"}
+            available = {id: f for id, f in self.enrich(current[2], current[0], current[1])["facilities"].items() if f["kind"] in ('shops', 'academy')}
             if any(id not in available for id in data.facility_ids):
                 raise ValueError("unknown_facility")
             previous = session["review_job"]
@@ -177,12 +181,26 @@ class AppState:
     def public_job(job):
         return {k: job[k] for k in ("id", "kind", "status", "profile", "result", "error", "metadata")}
 
-    def enrich(self, run):
+    def enrich(self, run, profile=None, candidates=None):
         ids = {e["source_record"] for m in run["modules"] for e in m["evidence"] if e["source_record"]}
         facilities = {id: {**self.index.records[id], "review_links": map_links(self.index.records[id])}
                       for id in ids if id in self.index.records}
         facilities.update({id: self.stop_index.records[id] for id in ids if id in self.stop_index.records})
-        return {**run, "facilities": facilities}
+        facilities.update({id: self.education_index.records[id] for id in ids if id in self.education_index.records})
+        details = []
+        if profile and candidates:
+            for criterion in profile.criteria:
+                if criterion.module_id != 'education' or not (criterion.importance > 0 or criterion.hard): continue
+                for candidate in candidates:
+                    try: observation = self.education_index.observe(criterion, candidate)
+                    except (ValueError, TypeError): continue
+                    details.append({'candidate_id': candidate.id, 'criterion_id': criterion.id, **observation})
+                    for row in observation['selected']:
+                        facilities[row['id']] = {**row, 'review_links': map_links(row)}
+        for id, row in list(facilities.items()):
+            if row['kind'] == 'academy' and 'review_links' not in row:
+                facilities[id] = {**row, 'review_links': map_links(row)}
+        return {**run, "facilities": facilities, 'education_details': details}
 
     def compare(self, session, data):
         with session["lock"]:
@@ -194,7 +212,24 @@ class AppState:
             session["review_key"] = run["run_id"]
             run["review_key"] = run["run_id"]
             session["comparison"] = (data.profile, data.candidates, run)
-            return self.enrich(run)
+            enriched = self.enrich(run, data.profile, data.candidates)
+        # Conditional public-only research follows numerical modules; no search when unnecessary.
+        requested = any(c.key in ('education_research', 'qualitative_research_requested') and c.value == 'requested'
+                        for c in data.profile.context)
+        if requested:
+            kind = 'academy' if any(c.key == 'education_research' and c.value == 'requested' for c in data.profile.context) else 'shops'
+            facilities = sorted((f for f in enriched['facilities'].values() if f['kind'] == kind),
+                key=lambda f:(min(distance_m(c.latitude,c.longitude,f['lat'],f['lon']) for c in data.candidates),f['id']))[:3]
+            if facilities:
+                enriched['research_facility_ids'] = [f['id'] for f in facilities]
+                try:
+                    enriched['research_job'] = self.reviews(session, ReviewInput(request_id='auto_' + secrets.token_hex(12),
+                        run_id=run['run_id'], facility_ids=[f['id'] for f in facilities]))
+                except RuntimeError:
+                    enriched['research_status'] = 'busy'
+            else:
+                enriched['research_status'] = 'no_verified_facility'
+        return enriched
 
     def preferences(self, session, data):
         with session["lock"]:
@@ -210,7 +245,7 @@ class AppState:
             result["references"] = [{**r, "profile_fingerprint": revised.fingerprint()} for r in run.get("references", [])]
             result["status"] = "partial" if any(d["status"] == "unknown" for a in report["assessments"] for d in a["details"]) else "completed"
             session["comparison"] = (revised, candidates, result)
-            return {"profile": revised.model_dump(), "run": self.enrich(result)}
+            return {"profile": revised.model_dump(), "run": self.enrich(result, revised, candidates)}
 
 
 def make_handler(state, env_path):
@@ -257,6 +292,7 @@ def make_handler(state, env_path):
                          "/reviews.js": (STATIC / "reviews.js", "text/javascript; charset=utf-8"),
                          "/transport.js": (STATIC / "transport.js", "text/javascript; charset=utf-8"),
                          "/housing.js": (STATIC / "housing.js", "text/javascript; charset=utf-8"),
+                         '/education.js': (STATIC / 'education.js', 'text/javascript; charset=utf-8'),
                          "/style.css": (STATIC / "style.css", "text/css; charset=utf-8"),
                          "/preview/app.js": (ROOT / "tools/preview/app.js", "text/javascript; charset=utf-8"),
                          "/preview/style.css": (ROOT / "tools/preview/style.css", "text/css; charset=utf-8")}
@@ -275,6 +311,7 @@ def make_handler(state, env_path):
                     token, _ = state.session()
                     return self.send(200, {"token": token, "data": {**state.index.metadata(),
                         "transport": state.stop_index.metadata(), "housing": state.housing.index.metadata(),
+                        'education': state.education_index.metadata(),
                         "candidate_generation": state.candidate_pool.metadata()
                         if state.candidate_pool else {"available": False}}})
                 if path.startswith("/api/jobs/"):
@@ -305,6 +342,8 @@ def make_handler(state, env_path):
                     return self.send(200, {"profile": quick_profile(QuickInput.model_validate(data)).model_dump()})
                 if path == "/api/transport-profile":
                     return self.send(200, {"profile": transport_profile(TransportInput.model_validate(data)).model_dump()})
+                if path == '/api/education-profile':
+                    return self.send(200, {'profile': education_profile(EducationInput.model_validate(data)).model_dump()})
                 if path == "/api/housing-reference":
                     return self.send(200, state.housing.reference(HousingQuery.model_validate(data)).model_dump())
                 if path == "/api/candidates":
@@ -351,6 +390,7 @@ def main():
     parser.add_argument("--candidate-pool", type=Path, default=ROOT / "data/processed/candidate-pool.json")
     parser.add_argument("--boundary", type=Path, default=ROOT / "data/reference/jinju-boundary-2025.geojson")
     parser.add_argument("--housing", type=Path, default=ROOT / "data/processed/housing.json")
+    parser.add_argument('--education', type=Path, default=ROOT / 'data/processed/education.json')
     args = parser.parse_args()
     sdk_key(args.env_file)
     document = json.loads(args.inventory.read_text(encoding="utf-8"))
@@ -364,10 +404,15 @@ def main():
         housing = HousingIndex.load(args.housing)
     except (OSError, ValueError, KeyError, TypeError):
         print("Housing reference unavailable: prepare validated apartment CSV snapshots.", flush=True)
-    state = AppState(ShopIndex(document), stop_index=StopIndex(document), candidate_pool=pool, housing_index=housing)
+    education = EducationIndex()
+    try:
+        education = EducationIndex.load(args.education, document)
+    except (OSError, ValueError, KeyError, TypeError):
+        print('Education unavailable: prepare verified school/academy snapshots.', flush=True)
+    state = AppState(ShopIndex(document), stop_index=StopIndex(document), candidate_pool=pool, housing_index=housing, education_index=education)
     server = ThreadingHTTPServer((args.host, args.port), make_handler(state, args.env_file))
     server.daemon_threads = True
-    print(f"Saljari M1/M2/M3: http://localhost:{args.port} (bind {args.host})", flush=True)
+    print(f"Saljari M1/M2/M3/M4: http://localhost:{args.port} (bind {args.host})", flush=True)
     server.serve_forever()
 
 

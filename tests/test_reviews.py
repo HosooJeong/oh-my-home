@@ -7,6 +7,7 @@ from app.codex_runner import RunnerError
 from app.reviews import (ReviewInput, ReviewExcerpt, ReviewResponse, StoreReviews,
                          VisibleText, source_url, research_reviews, fetch_article)
 from app.web import AppState, CompareInput, IntakeInput, PreferenceInput
+from app.research_policy import SourcePage
 from test_living import index, profile, candidates
 
 
@@ -30,15 +31,17 @@ class Runner:
 
 class ReviewTests(unittest.TestCase):
     def run_reviews(self, runner=None, text="작지만 품목은 다양했어요.", cancel=None):
+        page = None if text is None else SourcePage('가상 마트 가상 시험 주소 ' + text, ('2026-01-01',))
         return research_reviews(runner or Runner(), [index().records["shops:a"]],
-                                cancel=cancel or Event(), fetcher=lambda *args: text)
+                                cancel=cancel or Event(), fetcher=lambda *args: page)
 
     def test_verbatim_quote_checked_but_opinion_is_not_scored(self):
         runner=Runner(); result=self.run_reviews(runner)
         quote=result["items"][0]["excerpts"][0]
         self.assertTrue(quote["quote_verified"])
         self.assertFalse(quote["score_eligible"] or result["score_eligible"])
-        self.assertEqual(quote["identity_verification"], "model_reported")
+        self.assertEqual(quote["identity_verification"], "name_and_public_address_in_page")
+        self.assertTrue(quote['publication_verified'])
         prompt, args=runner.calls[0]
         self.assertTrue(args["search"]); self.assertEqual(args["domains"], ["tistory.com"])
         self.assertEqual(args["retries"],0)
@@ -50,10 +53,9 @@ class ReviewTests(unittest.TestCase):
             self.assertEqual(item["status"],"unverified")
             self.assertEqual(item["excerpts"],[])
 
-    def test_unknown_date_allowed_but_invalid_and_future_dates_rejected(self):
-        for value in ["2026-02-31","2099-01-01"]:
+    def test_unknown_old_invalid_and_future_dates_rejected(self):
+        for value in [None, "2018-01-01", "2026-02-31","2099-01-01"]:
             self.assertEqual(self.run_reviews(Runner([excerpt(published_date=value)]))["items"][0]["excerpts"],[])
-        self.assertIsNone(self.run_reviews(Runner([excerpt(published_date=None)]))["items"][0]["excerpts"][0]["published_date"])
 
     def test_different_store_or_no_search_rejected(self):
         for runner in [Runner([excerpt(matched_name="다른 점포")]),Runner(search_count=0)]:

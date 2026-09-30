@@ -12,6 +12,7 @@ from urllib.robotparser import RobotFileParser
 from pydantic import Field, model_validator
 from .codex_runner import RunnerError
 from .contracts import Contract
+from .research_policy import SourcePage, admissible, publication_dates, prompt_rules, MAX_AGE_DAYS
 
 DOMAINS = ["tistory.com"]
 USER_AGENT = "SaljariReviewCheck/0.1"
@@ -36,7 +37,7 @@ class ReviewExcerpt(Contract):
     published_date: Annotated[str, Field(pattern=r"^\d{4}-\d{2}-\d{2}$")] | None
     matched_name: Text
     identity_note: Text
-    topic: Literal["size", "selection", "price", "service", "experience"]
+    topic: Literal["size", "selection", "price", "service", "experience", "course", "teaching"]
     sentiment: Literal["positive", "negative", "mixed", "neutral"]
     quote: Annotated[str, Field(min_length=1, max_length=160)]
     interpretation: Text
@@ -116,8 +117,9 @@ def fetch_article(url, cancel):
         robots = RobotFileParser(); robots.parse(read(origin + "/robots.txt", 64000).splitlines())
         if not robots.can_fetch(USER_AGENT, url):
             return None
-        parser = VisibleText(); parser.feed(read(url, 1_000_000))
-        return normalize(" ".join(parser.parts))
+        html = read(url, 1_000_000)
+        parser = VisibleText(); parser.feed(html)
+        return SourcePage(normalize(" ".join(parser.parts)), publication_dates(html))
     except RunnerError:
         raise
     except Exception:
@@ -129,7 +131,7 @@ INSTRUCTIONS = """살자리의 상가 후기 조사기다. 공공자료의 매�
 셸/파일/MCP/로그인/지도 API를 사용하지 마라. 검색은 전체 4회 이내를 목표로 하고 반복하지 마라.
 카카오/네이버 지도 리뷰를 복사하거나 외부 LLM에 보내지 마라. 채용/광고/업체목록/휴무일 모음은 후기가 아니다.
 매장별 최대 2개 독립 방문 후기에서 규모, 품목, 가격, 서비스, 만족/불만족을 골고루 찾되
-실제로 없는 긍정/부정 의견을 억지로 균형 맞추지 마라. 오래된 글뿐이면 그 날짜를 보존한다.
+실제로 없는 긍정/부정 의견을 억지로 균형 맞추지 마라. 공통 최신성 기준을 벗어난 글은 버려라.
 영업/휴무 시간, 요일, 폐점 여부는 조사하지 않는다. 후기는 개인 경험이며 전체 평판/별점으로 일반화하지 마라.
 상호/지점과 주소 또는 지역을 대조한다. 다른 지점이면 버린다. matched_name은 입력 상호,
 identity_note는 실제 원문에서 지점을 식별한 근거다. source_url은 직접 원문 https 주소다.
@@ -141,13 +143,27 @@ published_date는 원문의 작성일 YYYY-MM-DD, 없으면 null. 찾지 못한 
 """
 
 
-def research_reviews(runner, shops, *, cancel: Event, fetcher=fetch_article):
+def research_reviews(runner, shops, *, cancel: Event, fetcher=fetch_article, purpose=None):
     if cancel.is_set():
         raise RunnerError("cancelled")
     if not 1 <= len(shops) <= 3:
         raise ValueError("invalid shop count")
-    payload = [{"facility_id": s["id"], "name": s["name"], "address": s["address"]} for s in shops]
-    answer = runner.run(INSTRUCTIONS + "\n입력 JSON:\n" + json.dumps(payload, ensure_ascii=False),
+    payload = [{"facility_id": s["id"], "kind": s['kind'], "name": s["name"], "address": s["address"]} for s in shops]
+    education = any(s.get('kind') in ('school', 'academy') for s in shops)
+    instructions = INSTRUCTIONS if not education else '''살자리 공공시설 보완 조사기다.
+입력 시설에 대해 요청한 정보만 공개 티스토리 원문에서 직접 검색해 확인한다.
+kind=academy는 과목, 대상 학년, 수업 형태, 규모 설명이나 일부 이용 경험을 조사한다.
+kind=shops는 방문 경험의 규모/품목/가격/서비스만 조사하며 학원처럼 해석하지 마라.
+학원 등록정원을 반 크기로 바꾸거나 교육 수준·안전·전체 만족도를 추정하지 마라.
+공식 주소/상호가 같은 시설인지 대조하고 원문이 지점을 특정하지 못하면 버려라.
+영업시간·휴무·개별 폐점 조사는 하지 마라. 전체 4회 이내 검색을 목표로 한다.
+각 facility_id를 정확히 한 번 반환한다. 시설당 최대 2개 짧은 인용, 출처당 20단어/160자 이하.
+quote는 직접 읽은 원문의 연속 문구, interpretation은 이에 한정한 AI 해석이다.
+published_date는 실제 작성일, matched_name은 입력 상호, identity_note는 주소/상호 대조 근거다.
+topic은 course/teaching/size/experience 등이다. 없는 정보를 채우지 말고 excerpts=[]로 반환한다.
+'''
+    answer = runner.run(prompt_rules() + instructions + '\n조사 목적: ' + (purpose or '규모·이용 경험 보완')
+                        + "\n입력 JSON:\n" + json.dumps(payload, ensure_ascii=False),
                         ReviewResponse, search=True, domains=DOMAINS, cancel=cancel, retries=0)
     expected = {s["id"]: s for s in shops}
     if len(answer.items) != len(shops) or {i.facility_id for i in answer.items} != set(expected):
@@ -155,7 +171,7 @@ def research_reviews(runner, shops, *, cancel: Event, fetcher=fetch_article):
     checked = datetime.now(timezone.utc).isoformat()
     pages, used_words, items = {}, {}, []
     for item in answer.items:
-        accepted, rejected = [], 0
+        accepted, rejected, reasons = [], 0, {}
         for excerpt in item.excerpts:
             if cancel.is_set():
                 raise RunnerError("cancelled")
@@ -164,23 +180,26 @@ def research_reviews(runner, shops, *, cancel: Event, fetcher=fetch_article):
             valid = (url and words <= 20 and used_words.get(url, 0) + words <= 20
                      and normalize(excerpt.matched_name).replace(" ", "") == normalize(expected[item.facility_id]["name"]).replace(" ", "")
                      and runner.last_metadata.get("web_search_count", 0) > 0)
-            try:
-                if excerpt.published_date and date.fromisoformat(excerpt.published_date) > date.today():
-                    valid = False
-            except ValueError:
-                valid = False
+            reason = None
             if valid:
                 if url not in pages:
                     pages[url] = fetcher(url, cancel)
-                valid = bool(pages[url] and normalize(excerpt.quote) in pages[url])
+                reason = admissible(excerpt, pages[url], expected[item.facility_id])
+                valid = reason is None
             if not valid:
                 rejected += 1
+                reason = reason or 'source_identity_or_search_unverified'
+                reasons[reason] = reasons.get(reason, 0) + 1
                 continue
             used_words[url] = used_words.get(url, 0) + words
             accepted.append({**excerpt.model_dump(), "source_url": url, "quote_verified": True,
-                             "identity_verification": "model_reported", "score_eligible": False})
+                             "identity_verification": "name_and_public_address_in_page",
+                             "publication_verified": True, "score_eligible": False})
         items.append({"facility_id": item.facility_id, "excerpts": accepted, "rejected_count": rejected,
+                      "rejection_reasons": reasons,
                       "status": "found" if accepted else "unverified" if rejected else "not_found"})
     if cancel.is_set():
         raise RunnerError("cancelled")
-    return {"items": items, "checked_at": checked, "score_eligible": False}
+    return {"items": items, "checked_at": checked, "score_eligible": False,
+            "policy": {"max_age_days": MAX_AGE_DAYS, "unknown_publication_date": "reject",
+                       "source_scope": DOMAINS, "numeric_scores": "unchanged"}}
