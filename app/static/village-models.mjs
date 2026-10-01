@@ -77,6 +77,14 @@ export function createToyModels(T){
   }
   for(let i=0;i<4;i++)cylinder(g,'#bc6747',(i-1.5)*width/4,y+.48,0,.105,width/4-.012,[0,0,Math.PI/2]);
  }
+ function slope(g,color,x,y,z,side){
+  const geometry=cached('home-slope-1x1',()=>{
+   const s=new T.Shape();s.moveTo(-.164,-.18);s.lineTo(.164,-.18);s.lineTo(.164,-.085);s.lineTo(-.164,.18);s.closePath();
+   const geo=new T.ExtrudeGeometry(s,{depth:.328,bevelEnabled:true,bevelThickness:.004,bevelSize:.004,bevelSegments:2,steps:1});
+   geo.translate(0,0,-.164);return geo;
+  });
+  part(g,geometry,color,x,y,z,[0,side<0?Math.PI:0,0]);
+ }
  function tree(x=0,z=0,scale=1){
   const g=new T.Group();g.position.set(x,.18,z);g.scale.setScalar(scale);
   cylinder(g,'#987350',0,.5,0,.095,.88);brick(g,'#857c52',0,.12,0,2,2,.14);
@@ -84,21 +92,54 @@ export function createToyModels(T){
   return finish(g);
  }
  function home(){
-  const g=new T.Group();brick(g,'#d4c5a4',0,.12,0,7,6,.21,.32);
-  wall(g,'#eed8b3',1.55,1.35,5);brick(g,cream,0,1.53,0,5,4,.13,.34);
-  door(g,.24,.73,.72);window(g,-.42,1,.74,.32,.47);window(g,.78,1.02,-.2,.38,.47,Math.PI/2);
-  window(g,-.78,1.02,-.15,.38,.47,-Math.PI/2);window(g,0,1.04,-.71,.4,.43,Math.PI);
-  // Triangular gables are built from progressively narrower stacked bricks.
-  for(const z of [-.65,.65])for(let row=0;row<3;row++)tile(g,'#f2dfbd',0,1.68+row*.15,z,1.3-row*.38,.145,.12);
-  roof(g,1.98,1.7,1.68,'#d87952');
-  for(let row=0;row<3;row++)brick(g,'#b57d61',.51,2.02+row*.19,-.28,1,1,.19,.3);
-  tile(g,cream,.51,2.53,-.28,.4,.1,.4);tile(g,dark,.51,2.589,-.28,.2,.018,.2);
-  for(let i=0;i<2;i++)tile(g,'#ddc8a0',.24,.18-i*.045,.93+i*.17,.64+i*.14,.12,.25);
-  for(const x of [-.72,.7]){tile(g,'#b8996b',x,.26,.93,.42,.13,.3);flower(g,x-.08,1,'#cd7962');flower(g,x+.08,1,'#e6bd68');}
-  // Fence studs, a tiny mailbox and a front doormat.
-  for(const x of [-.95,1.0]){brick(g,white,x,.31,.18,1,3,.14,.22);for(let i=0;i<3;i++)tile(g,white,x,.5,-.05+i*.22,.055,.36,.055);tile(g,white,x,.55,.18,.07,.07,.6);}
-  tile(g,'#c1916c',.24,.3,.88,.34,.015,.2);tile(g,'#6c8e86',.91,.51,.61,.26,.21,.17);tile(g,white,.91,.48,.71,.17,.02,.012);
-  return finish(g);
+  const g=new T.Group(),yellow='#efd083',roofRed='#b95843',pitch=.34;
+  // One stud grid governs base, genuine thick brick courses, openings and roof parts.
+  brick(g,'#97b599',0,.12,0,7,6,.136,pitch);
+  brick(g,white,0,.285,0,5,4,.136,pitch);
+  for(let row=0;row<4;row++){
+   const y=.57+row*.408,color=row===0?'#e1ba63':yellow;
+   // The front openings are assembled from bricks; no wall is drawn behind the glass or door.
+   for(let i=0;i<5;i++){
+    if((i===3&&row<3)||([1,2].includes(i)&&[1,2].includes(row)))continue;
+    brick(g,color,(i-2)*pitch,y,.51,1,1,.408,pitch);
+   }
+   const runs=row%2?[[1,-.68],[2,-.17],[2,.51]]:[[2,-.51],[2,.17],[1,.68]];
+   for(const [n,x] of runs)brick(g,color,x,y,-.51,n,1,.408,pitch);
+   for(const x of [-.68,.68]){
+    if(row===1||row===2)continue;
+    brick(g,color,x,y,0,1,2,.408,pitch);
+   }
+  }
+  window(g,-.17,1.19,.686,.56,.65);
+  window(g,.855,1.19,0,.55,.65,Math.PI/2);window(g,-.855,1.19,0,.55,.65,-Math.PI/2);
+  // A molded door frame, inset panels, hinge pins and a round plastic handle.
+  for(const x of [.147,.533])tile(g,white,x,.99,.691,.065,1.27,.105);
+  tile(g,white,.34,1.64,.691,.45,.09,.105);
+  tile(g,'#688b7d',.34,.99,.674,.32,1.19,.062);
+  tile(g,glass,.34,1.29,.715,.22,.3,.025,[0,0,0],'glass');
+  tile(g,'#86a393',.34,.67,.715,.22,.32,.025);
+  for(const y of [.61,1.36])cylinder(g,white,.515,y,.719,.027,.10);
+  cylinder(g,'#e1bf6a',.232,.93,.741,.036,.048,[Math.PI/2,0,0]);
+  brick(g,white,0,2.044,0,5,4,.136,pitch);
+  // Stepped gables and solid sloping molded parts share a continuous roof plane.
+  for(const z of [-.51,.51])for(let row=0;row<3;row++)brick(g,yellow,0,2.21+row*.272,z,5-row*2,1,.272,pitch);
+  for(const side of [-1,1])for(let row=0;row<3;row++)for(let col=0;col<5;col++)
+   slope(g,row===2?'#ac503d':roofRed,side*(row+.5)*pitch,2.85-row*.265,(col-2)*pitch,side);
+  for(let i=0;i<5;i++)brick(g,roofRed,0,3.035,(i-2)*pitch,1,1,.105,pitch);
+  for(const x of [-1.025,1.025])tile(g,white,x,2.18,0,.065,.10,1.75);
+  // Hollow chimney mouth, collars and individually molded courses.
+  for(let row=0;row<4;row++)brick(g,'#c89678',.65,2.75+row*.136,-.40,1,1,.136,pitch);
+  tile(g,dark,.65,3.266,-.40,.22,.04,.22);
+  for(const x of [.49,.81])tile(g,cream,x,3.29,-.40,.085,.105,.40);
+  for(const z of [-.56,-.24])tile(g,cream,.65,3.29,z,.245,.105,.085);
+  // Studded front step, tile doormat, window box and a mail-slot brick.
+  brick(g,white,.34,.18,.82,2,1,.136,pitch);
+  tile(g,'#b3976b',.34,.269,.83,.38,.018,.23);
+  tile(g,'#b99067',-.46,.42,.85,.43,.16,.25);
+  flower(g,-.54,.87,'#d78670');flower(g,-.37,.87,'#e6bf64');
+  brick(g,'#6c9584',.95,.285,.35,1,1,.136,pitch);
+  tile(g,'#6c9584',.95,.52,.35,.24,.34,.22);tile(g,white,.95,.61,.475,.14,.025,.016);
+  const result=finish(g);result.userData.design='stud-grid-house-v2';return result;
  }
  function bus(color='#e3b653',small=false){
   const g=new T.Group();plate(g,'#c7beaa',5,3);
