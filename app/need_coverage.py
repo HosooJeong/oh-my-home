@@ -111,7 +111,8 @@ def review_needs(profile, sources, needs=None, required_ids=(), previous=None, a
         elif n.handling in ('reference','research','background') and not n.context_keys:
             raise RunnerError('unrepresented_context_need')
         if n.handling=='research' and not any(c['key'] in n.context_keys and c['value']=='requested' and
-            c['key'] in ('qualitative_research_requested','education_research','safety_research','leisure_research')
+            c['key'] in ('qualitative_research_requested','education_research','safety_research','leisure_research',
+                         'transport_research','housing_research','extension_research')
             for c in doc['context']):raise RunnerError('unrepresented_research_need')
         by_source[n.source_id].append(n)
 

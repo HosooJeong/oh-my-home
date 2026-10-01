@@ -125,6 +125,10 @@ travel_time에 명시된 만큼 보존하라. 목적지 좌표·통근시간·�
 만들지 말고 context에 보존하라. 거래 방식이 명시되면 housing_tenure 값은 sale(매매),
 jeonse(전세), monthly(월세)다. 예산·전용면적·주택유형은 housing_budget, housing_area,
 housing_type에 원문 수준으로 보존하라. 월세와 보증금을 합산/전환하거나 금액 기준을 추정하지 마라.
+실거래 조회의 법정동은 housing_legal_area에 정확한 요청 이름, 원문 지역은 housing_location에 보존하라.
+전용면적 ㎡의 명시된 숫자 경계는 housing_area_min_m2/housing_area_max_m2에 문자열로 보존하라.
+최대값 '이하'는 housing_area_max_inclusive=true, '미만'은 false다. 애매한 범위는 묻고 임의로 경계를 만들지 마라.
+신규/갱신 계약 조회는 housing_contract=new/renewal/all이다. 평/공급면적·금액필터·다른 주택유형을 임의 변환하지 마라.
 실제 집의 예산/방 수/주택 조건을 비교해야 하는 요구는 별도 미지원 criteria로 보존하라.
 지역 대표 가격을 그 요구의 근거로 만들지 마라. 집값을 참고하는 데 거리나 만족도 기준을 묻지 마라.
 교육 module_id=education: school_straight_line_distance_m은 m/lower,
@@ -165,6 +169,18 @@ parameters.activity는 gym/pilates/table_tennis/swimming/tennis/yoga/other, acti
 같은 공원/동일 만남 지점의 동일 거리 조건을 중복 생성하지 마라.
 parameters에 해당 없는 필드는 null이다.
 생활 매장 정성 조사 요청은 context qualitative_research_requested=requested로 보존하라.
+각 보완 조사 질문을 living_research_question/education_research_question/safety_research_question/leisure_research_question에
+원래 확인하려던 조건을 살린 간결한 비식별 질문으로 보존하라. source_id는 그 질문의 원문이다.
+알레르기 상품 표시/휠체어 출입·반 규모/과목/요일·이용 형태/가격 등 기능 조건은 유지하되
+사람 이름·연락처·개인 진단·집 주소/좌표·가족 신상은 질문에 넣지 마라. 시설 공개 상호/종목은 유지할 수 있다.
+living_research_target=grocery/convenience/shops, education_research_target=academy/school 또는
+명시된 다른 시설유형 원문을 해당 질문과 같은 source_id에 보존하라. 지정 상호는 *_research_facility에 보존하라.
+학원 조사 자체의 과목/학령/직선반경이 있으면 education_research_subject, education_research_school_level,
+education_research_radius_m에 허용 코드/숫자로
+보존하라. 여러 기존 조건 중 하나를 조사한다면 *_research_criterion_id에 해당 조건 ID를 연결하라.
+조사 질문이 여러 개면 같은 question key도 source_id별로 반복할 수 있다. 다른 질문을 한 범용 후기로 합치지 마라.
+교통/집·비용/기타 웹 조사를 요청하면 transport_research/housing_research/extension_research=requested와
+각 *_research_question을 보존하라. 이 분야의 웹 조사 미지원도 사용자 요청을 지우는 이유가 아니다.
 여가 취미 조사 요청을 생활 매장 후기 요청으로 중복 지정하지 마라.
 직선거리 목표/만족도 0 기준이 없으면 utility=null로 두고 직선거리 기준을 질문하라.
 장보기 대상이 불명확하면 마트인지 편의점인지 질문하라. 신선식품 재고·영업시간·의료 요구는

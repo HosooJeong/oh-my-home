@@ -25,6 +25,7 @@ class HousingQuery(Contract):
     legal_area: Annotated[str, Field(max_length=100)] = ""
     area_min_m2: Annotated[float, Field(ge=0, le=1000, allow_inf_nan=False)] = 0.0
     area_max_m2: Annotated[float, Field(gt=0, le=1000, allow_inf_nan=False)] = 1000.0
+    area_max_inclusive: bool = False
     contract: Literal["all", "new", "renewal"] = "all"
 
     @model_validator(mode="after")
@@ -119,7 +120,7 @@ class HousingModule:
             raise ValueError("unknown legal area")
         d = self.index.document or {}
         tenure_label = {"sale": "매매", "jeonse": "전세", "monthly": "월세"}[query.tenure]
-        scope = f"진주시 {query.legal_area or '전체'} · 아파트 {tenure_label} · 전용 {query.area_min_m2:g}㎡ 이상 {query.area_max_m2:g}㎡ 미만"
+        scope = f"진주시 {query.legal_area or '전체'} · 아파트 {tenure_label} · 전용 {query.area_min_m2:g}㎡ 이상 {query.area_max_m2:g}㎡ {'이하' if query.area_max_inclusive else '미만'}"
         if query.contract != "all":
             scope += " · " + {"new": "신규", "renewal": "갱신"}[query.contract]
         rows = []
@@ -127,7 +128,7 @@ class HousingModule:
             if cancel is not None and cancel.is_set():
                 raise InterruptedError("cancelled")
             if (row["tenure"] == query.tenure and (not query.legal_area or row["legal_area"] == query.legal_area)
-                    and query.area_min_m2 <= row["area_m2"] < query.area_max_m2
+                    and query.area_min_m2 <= row["area_m2"] and (row["area_m2"] <= query.area_max_m2 if query.area_max_inclusive else row["area_m2"] < query.area_max_m2)
                     and (query.contract == "all" or row["contract"] == query.contract)):
                 rows.append(row)
         measurements = []
@@ -147,11 +148,19 @@ class HousingModule:
             query_fingerprint=digest(query.model_dump()), scope=scope, sample_count=len(rows), distributions=measurements,
             contract_counts={k: sum(r["contract"] == k for r in rows) for k in ("new", "renewal", "unknown")},
             source_url=SOURCE, period_start=d.get("period_start"), period_end=d.get("period_end"),
-            retrieved_at=d.get("retrieved_at"), snapshot_fingerprint=digest(d) if d else None, limitations=LIMITATIONS)
+            retrieved_at=d.get("retrieved_at"), snapshot_fingerprint=digest(d) if d else None, limitations=LIMITATIONS,
+            query=query.model_dump())
 
     def run_reference(self, profile, candidates, cancel):
-        # Only exact explicit context values; no guessed budget-to-price conversions.
-        facts = {f.key: f.value for f in profile.context}
-        tenure = facts.get("housing_tenure", "sale")
-        query = HousingQuery(tenure=tenure if tenure in ("sale", "jeonse", "monthly") else "sale")
-        return self.reference(query, profile, candidates, cancel)
+        from ..housing_scope import housing_scope
+        query,errors=housing_scope(profile,{r['legal_area'] for r in self.index.records},self.index.document is not None)
+        if not errors:return self.reference(query,profile,candidates,cancel)
+        d=self.index.document or {}
+        return ReferenceResult(module_id=self.id,module_version=self.version,
+            profile_fingerprint=profile.fingerprint(),candidates_fingerprint=digest([c.model_dump() for c in candidates]),
+            status='unsupported',query_fingerprint=digest({'query':query.model_dump() if query else None,'errors':errors}),
+            scope='요청한 실거래 조회 범위를 확인해야 해.',sample_count=0,distributions=[],
+            contract_counts={'new':0,'renewal':0,'unknown':0},source_url=SOURCE,
+            period_start=d.get('period_start'),period_end=d.get('period_end'),retrieved_at=d.get('retrieved_at'),
+            snapshot_fingerprint=digest(d) if d else None,limitations=LIMITATIONS,unhandled_filters=errors,
+            query=query.model_dump() if query else {})

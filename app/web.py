@@ -17,6 +17,7 @@ from .contracts import Candidate, Contract, InterviewTurn, NeedProfile, Weight, 
 from .candidates import CandidatePool, GenerationInput
 from .intake import prepare_profile
 from .reviews import ReviewInput, map_links, research_reviews
+from .research_plan import build_research_plan, evidence_status
 from .preference_edits import PreservationError, edited, edit_quote, preserve_need
 from .modules.living import LivingModule, ShopIndex
 from .modules.transport import StopIndex, TransportModule
@@ -120,6 +121,10 @@ def quick_profile(data: QuickInput):
     return NeedProfile.model_validate(doc)
 
 
+class HousingProfileInput(Contract):
+    profile: NeedProfile
+
+
 class AppState:
     def __init__(self, index, runner_factory=CodexRunner, stop_index=None, candidate_pool=None, housing_index=None, education_index=None, safety_index=None, leisure_index=None):
         self.index, self.runner_factory = index, runner_factory
@@ -164,7 +169,8 @@ class AppState:
             current = session["comparison"]
             if current is None or current[2]["run_id"] != data.run_id:
                 raise ValueError("stale_comparison")
-            available = {id: f for id, f in self.enrich(current[2], current[0], current[1])["facilities"].items() if f["kind"] in ('shops', 'academy')}
+            enriched = self.enrich(current[2], current[0], current[1])
+            available = {id: f for id, f in enriched["facilities"].items() if f["kind"] in ('shops', 'academy')}
             if any(id not in available for id in data.facility_ids):
                 raise ValueError("unknown_facility")
             previous = session["review_job"]
@@ -173,11 +179,17 @@ class AppState:
                     raise ValueError("research_already_requested")
                 return self.public_job(previous)
             shops = [available[id] for id in data.facility_ids]
+            plan = build_research_plan(current[0], current[1], enriched, [], None, self.education_index)
+            requested = [r for r in plan['requests'] if r['module'] in ('living', 'education')]
+            questions = [q for t in plan['tasks'] for q in t.get('questions', [])
+                         if set(q['facility_ids']).intersection(data.facility_ids)] if requested else None
+            if requested and not set(data.facility_ids).issubset({id for q in questions for id in q['facility_ids']}):
+                raise ValueError('research_scope_unconfirmed')
             return self.start_job(session, data, "reviews",
-                lambda runner, cancel: research_reviews(runner, shops, cancel=cancel),
+                lambda runner, cancel: research_reviews(runner, shops, cancel=cancel, questions=questions),
                 review_key=session["review_key"])
 
-    def start_job(self, session, data, kind, execute, review_key=None):
+    def start_job(self, session, data, kind, execute, review_key=None, request_statuses=()):
         fingerprint = digest({"kind": kind, **data.model_dump()})
         with self.lock:
             old = session["jobs"].get(data.request_id)
@@ -191,7 +203,7 @@ class AppState:
                 del session["jobs"][next(iter(session["jobs"]))]
             job = {"id": data.request_id, "kind": kind, "status": "running", "profile": None,
                    "result": None, "error": None, "cancel": Event(),
-                   "fingerprint": fingerprint, "metadata": None}
+                   "fingerprint": fingerprint, "metadata": None, "request_statuses":[dict(r) for r in request_statuses]}
             session["jobs"][data.request_id] = job
             if kind in ('reviews', 'supplement'):
                 session["review_job"] = job
@@ -214,6 +226,10 @@ class AppState:
                 with self.lock:
                     code = error.code if isinstance(error, RunnerError) else kind + "_failed"
                     job.update(status="cancelled" if job["cancel"].is_set() else "failed", error=code)
+                    job['request_statuses']=[dict(r,status=job['status'],reason=code) if r['status'] in ('queued','running') else r for r in job['request_statuses']]
+                    if kind=='supplement' and session['review_key']==review_key and session['comparison']:
+                        plan=session['comparison'][2].get('research_plan')
+                        if plan is not None:plan['requests']=[dict(r) for r in job['request_statuses']]
             finally:
                 with self.lock:
                     job["metadata"] = runner.last_metadata if runner else None
@@ -223,7 +239,8 @@ class AppState:
 
     @staticmethod
     def public_job(job):
-        return {k: job[k] for k in ("id", "kind", "status", "profile", "result", "error", "metadata")}
+        return {**{k: job[k] for k in ("id", "kind", "status", "profile", "result", "error", "metadata")},
+                "request_statuses":[dict(r) for r in job.get("request_statuses",[])]}
 
     def enrich(self, run, profile=None, candidates=None):
         ids = {e["source_record"] for m in run["modules"] for e in m["evidence"] if e["source_record"]}
@@ -231,6 +248,7 @@ class AppState:
                       for id in ids if id in self.index.records}
         facilities.update({id: self.stop_index.records[id] for id in ids if id in self.stop_index.records})
         facilities.update({id: self.education_index.records[id] for id in ids if id in self.education_index.records})
+        facilities.update(run.get('research_facilities',{}))
         details = []
         if profile and candidates:
             for criterion in profile.criteria:
@@ -265,31 +283,59 @@ class AppState:
                                 'date':r['date'],'source_url':r['source_url'],'distance_m':round(d,3)} for d,r in ranked]})
         return {**run, "facilities": facilities, 'education_details': details,'leisure_details':leisure_details}
 
-    def supplement(self, session, run_id, facilities, targets, leisure_scope=None):
-        """One cancellable, comparison-bound task; category research executes sequentially."""
+    def supplement(self, session, run_id, facilities, targets, leisure_scope=None, plan=None):
+        """Comparison-bound task; independent requested categories, one sequential model slot."""
         with session['lock']:
             if not session['comparison'] or session['comparison'][2]['run_id'] != run_id:
                 raise ValueError('stale_comparison')
+            tasks=plan['tasks'] if plan is not None else [
+                {'module':'facility_reviews','facilities':facilities,'request_ids':[]},
+                {'module':'safety','targets':targets,'request_ids':[]},
+                {'module':'leisure','scope':leisure_scope,'request_ids':[]}]
+            statuses=[dict(r) for r in plan['requests']] if plan is not None else []
+            public_plan=session['comparison'][2].get('research_plan')
+            request_id='auto_'+secrets.token_hex(12)
+            def mark(ids,status,reason=None,evidence=None):
+                nonlocal statuses
+                statuses=[dict(r,status=status,reason=reason,evidence_status=evidence) if r['id'] in ids else r for r in statuses]
+                with self.lock:
+                    session['jobs'][request_id]['request_statuses']=[dict(r) for r in statuses]
+                    if public_plan is not None:public_plan['requests']=[dict(r) for r in statuses]
             def execute(runner, cancel):
-                result = {'items':[], 'score_eligible':False, 'safety':None,'leisure':None, 'steps':[], 'errors':[]}
-                for module, enabled, query in [
-                    ('facility_reviews', facilities, lambda:research_reviews(runner,facilities,cancel=cancel)),
-                    ('safety', targets, lambda:research_safety(runner,targets,cancel=cancel)),
-                    ('leisure',leisure_scope,lambda:research_leisure(runner,leisure_scope,cancel=cancel,index=self.leisure_index))]:
-                    if not enabled: continue
+                result={'items':[], 'score_eligible':False, 'safety':None, 'leisure':None, 'steps':[], 'errors':[]}
+                for task in tasks:
+                    module=task['module'];ids=task['request_ids']
+                    if not (task.get('facilities') or task.get('targets') or task.get('scope')):continue
+                    if cancel.is_set():
+                        mark([r['id'] for r in statuses if r['status'] in ('queued','running')],'cancelled','cancelled')
+                        raise RunnerError('cancelled')
+                    mark(ids,'running')
                     try:
-                        value = query()
-                        if module == 'safety': result['safety'] = value
-                        elif module == 'leisure': result['leisure'] = value
-                        else: result.update(value)
+                        if module in ('living','education','facility_reviews'):
+                            value=research_reviews(runner,task['facilities'],cancel=cancel,questions=task.get('questions'))
+                            result['items'].extend(value.get('items',[]))
+                        elif module=='safety':
+                            value=research_safety(runner,task['targets'],cancel=cancel);result['safety']=value
+                        else:
+                            value=research_leisure(runner,task['scope'],cancel=cancel,index=self.leisure_index);result['leisure']=value
+                        for record in [r for r in statuses if r['id'] in ids]:
+                            scoped=value
+                            if module in ('living','education','facility_reviews'):
+                                scoped={**value,'items':[i for i in value.get('items',[]) if i['facility_id'] in record['facility_ids']]}
+                            elif module=='leisure' and record['criterion_ids']:
+                                scoped={**value,'discoveries':[i for i in value.get('discoveries',[]) if i.get('criterion_id') in record['criterion_ids']]}
+                            mark([record['id']],'completed',evidence=evidence_status(module,scoped))
                     except Exception as error:
-                        if cancel.is_set(): raise RunnerError('cancelled')
-                        result['errors'].append({'module':module,
-                            'code':error.code if isinstance(error,RunnerError) else 'research_failed'})
-                    result['steps'].append({'module':module, **runner.last_metadata})
+                        if cancel.is_set():
+                            mark([r['id'] for r in statuses if r['status'] in ('queued','running')],'cancelled','cancelled')
+                            raise RunnerError('cancelled')
+                        code=error.code if isinstance(error,RunnerError) else 'research_failed'
+                        result['errors'].append({'module':module,'code':code});mark(ids,'failed',code)
+                    result['steps'].append({'module':module,**runner.last_metadata})
+                result['requests']=statuses
                 return result
-            return self.start_job(session, SupplementInput(request_id='auto_'+secrets.token_hex(12),run_id=run_id),
-                'supplement', execute, review_key=session['review_key'])
+            return self.start_job(session,SupplementInput(request_id=request_id,run_id=run_id),
+                'supplement',execute,review_key=session['review_key'],request_statuses=statuses)
 
     def compare(self, session, data):
         with session["lock"]:
@@ -302,32 +348,31 @@ class AppState:
             run["review_key"] = run["run_id"]
             session["comparison"] = (data.profile, data.candidates, run)
             enriched = self.enrich(run, data.profile, data.candidates)
-        # Conditional public-only research follows numerical modules; no search when unnecessary.
-        requested = any(c.key in ('education_research', 'qualitative_research_requested') and c.value == 'requested'
-                        for c in data.profile.context)
-        facilities = []
-        if requested:
-            kind = 'academy' if any(c.key == 'education_research' and c.value == 'requested' for c in data.profile.context) else 'shops'
-            facilities = sorted((f for f in enriched['facilities'].values() if f['kind'] == kind),
-                key=lambda f:(min(distance_m(c.latitude,c.longitude,f['lat'],f['lon']) for c in data.candidates),f['id']))[:3]
-            if not facilities:
-                enriched['research_status'] = 'no_verified_facility'
-        targets = self.safety_index.research_targets(data.profile, data.candidates)
-        run['safety_research_scope'] = targets
-        enriched['safety_research_scope'] = targets
-        if context_value(data.profile, 'safety_research') == 'requested' and not targets:
-            enriched['safety_research_status'] = 'no_verified_area_or_topic'
+        targets=self.safety_index.research_targets(data.profile,data.candidates)
         leisure_scope=self.leisure_index.hobby_scope(data.profile,data.candidates) if context_value(data.profile,'leisure_research')=='requested' else None
-        run['leisure_research_scope']=leisure_scope
-        enriched['leisure_research_scope']=leisure_scope
-        if context_value(data.profile,'leisure_research')=='requested' and not leisure_scope:
-            enriched['leisure_research_status']='no_supported_activity'
-        if facilities or targets or leisure_scope:
-            enriched['research_facility_ids'] = [f['id'] for f in facilities]
-            try:
-                enriched['research_job'] = self.supplement(session,run['run_id'], facilities, targets,leisure_scope)
+        plan=build_research_plan(data.profile,data.candidates,enriched,targets,leisure_scope,self.education_index)
+        if run.get('report') is None:
+            for r in plan['requests']:
+                if r['status']=='queued':r.update(status='not_executed',reason='needs_input')
+            plan['tasks']=[]
+        all_areas={a['code'] for c in data.candidates if (a:=self.safety_index.area(c))}
+        searched={t['area_code'] for t in targets}
+        for r in plan['requests']:
+            if r['module']=='safety':r.update(area_codes=sorted(searched),unsearched_area_codes=sorted(all_areas-searched))
+            if r['module']=='leisure' and leisure_scope:r['unsearched_areas']=leisure_scope.get('unsearched_areas',[])
+        public_plan={k:v for k,v in plan.items() if k!='tasks'}
+        run['research_facilities']={f['id']:f for task in plan['tasks'] for f in task.get('facilities',[])}
+        enriched['facilities'].update(run['research_facilities'])
+        run['research_plan']=public_plan;enriched['research_plan']=public_plan
+        run['safety_research_scope']=targets;enriched['safety_research_scope']=targets
+        run['leisure_research_scope']=leisure_scope;enriched['leisure_research_scope']=leisure_scope
+        if plan['tasks']:
+            enriched['research_facility_ids']=list(dict.fromkeys(f['id'] for t in plan['tasks'] for f in t.get('facilities',[])))
+            try:enriched['research_job']=self.supplement(session,run['run_id'],[],targets,leisure_scope,plan)
             except RuntimeError:
-                enriched['research_status'] = 'busy'
+                enriched['research_status']='busy'
+                for r in public_plan['requests']:
+                    if r['status']=='queued':r.update(status='not_executed',reason='busy')
         return enriched
 
     def preferences(self, session, data):
@@ -464,6 +509,11 @@ def make_handler(state, env_path):
                     return self.send(200, {'profile': safety_profile(SafetyInput.model_validate(data)).model_dump()})
                 if path == '/api/leisure-profile':
                     return self.send(200, {'profile': leisure_profile(LeisureInput.model_validate(data)).model_dump()})
+                if path == '/api/housing-profile-reference':
+                    request=HousingProfileInput.model_validate(data)
+                    result=state.housing.run_reference(request.profile,[],Event()).model_dump()
+                    result['research_plan']={k:v for k,v in build_research_plan(request.profile,[],{'modules':[],'facilities':{}},[],None).items() if k!='tasks'}
+                    return self.send(200,result)
                 if path == "/api/housing-reference":
                     return self.send(200, state.housing.reference(HousingQuery.model_validate(data)).model_dump())
                 if path == "/api/candidates":

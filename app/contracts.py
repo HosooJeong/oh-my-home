@@ -240,7 +240,7 @@ class ReferenceResult(Contract):
     module_version: Text
     profile_fingerprint: str | None
     candidates_fingerprint: str | None
-    status: Literal["available", "insufficient", "empty", "unavailable"]
+    status: Literal["available", "insufficient", "empty", "unavailable", "unsupported"]
     query_fingerprint: str
     scope: Text
     sample_count: Annotated[int, Field(ge=0)]
@@ -252,6 +252,8 @@ class ReferenceResult(Contract):
     retrieved_at: str | None
     snapshot_fingerprint: str | None
     limitations: list[Text]
+    query: dict[str, str | float | bool] = Field(default_factory=dict)
+    unhandled_filters: list[Text] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def consistent(self):
@@ -263,9 +265,9 @@ class ReferenceResult(Contract):
         if self.status == "insufficient" and (not 0 < self.sample_count < 5
                 or any(d.median is not None for d in self.distributions)):
             raise ValueError("undersized reference must withhold summaries")
-        if self.status in ("empty", "unavailable") and (self.sample_count or self.distributions):
+        if self.status in ("empty", "unavailable", "unsupported") and (self.sample_count or self.distributions):
             raise ValueError("empty reference has measurements")
-        if self.status != "unavailable" and not all((self.period_start, self.period_end, self.retrieved_at, self.snapshot_fingerprint)):
+        if self.status not in ("unavailable", "unsupported") and not all((self.period_start, self.period_end, self.retrieved_at, self.snapshot_fingerprint)):
             raise ValueError("reference provenance missing")
         return self
 

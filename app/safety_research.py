@@ -111,7 +111,8 @@ def fetch_official_article(url, cancel):
 
 
 INSTRUCTIONS = '''살자리의 안전·환경 공식 지역자료 보완 조사기다.
-입력에는 공개 행정동 이름/코드와 문제 종류만 있다. 각 행정동의 요청한 문제만 직접 웹검색하고 원문을 읽어라.
+입력에는 공개 행정동 이름/코드, 문제 종류와 비식별 기능 questions가 있다.
+각 행정동의 questions에 담긴 실제 요청 문제를 직접 웹검색하고 원문을 읽어라. 이를 범용 안전 소개로 대신하지 마라.
 제공처는 진주시청 www.jinju.go.kr의 개별 게시글이다. 전체 4회 이내 검색을 목표로 하라.
 작성일이 확인되는 최신 게시글 중 본문이 해당 읍면동과 요청 문제를 직접 다루는 경우만 선택하라.
 사이트 메뉴에 동 이름이 있다는 이유로 그 동의 자료로 연결하지 마라. 시 전체 집계/다른 동은 해당 동 근거가 아니다.
@@ -129,7 +130,7 @@ def research_safety(runner, targets, *, cancel, fetcher=fetch_official_article):
         raise ValueError('invalid area scope')
     if cancel.is_set(): raise RunnerError('cancelled')
     payload = [{'area_code':t['area_code'], 'area_name':t['area_name'],
-                'topics': {k:TOPICS[k] for k in t['topics']}} for t in targets]
+                'topics': {k:TOPICS[k] for k in t['topics']},'questions':t.get('questions',[])} for t in targets]
     answer = runner.run(prompt_rules() + INSTRUCTIONS + '\n공개 조사 범위 JSON:\n' + json.dumps(payload,ensure_ascii=False),
                         SafetyResearchResponse, search=True, domains=DOMAINS, cancel=cancel, retries=0)
     expected = {t['area_code']:t for t in targets}

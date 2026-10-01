@@ -143,12 +143,16 @@ published_date는 원문의 작성일 YYYY-MM-DD, 없으면 null. 찾지 못한 
 """
 
 
-def research_reviews(runner, shops, *, cancel: Event, fetcher=fetch_article, purpose=None):
+def research_reviews(runner, shops, *, cancel: Event, fetcher=fetch_article, purpose=None, questions=None):
     if cancel.is_set():
         raise RunnerError("cancelled")
     if not 1 <= len(shops) <= 3:
         raise ValueError("invalid shop count")
     payload = [{"facility_id": s["id"], "kind": s['kind'], "name": s["name"], "address": s["address"]} for s in shops]
+    if questions is not None:
+        for row in payload:
+            row['questions']=[{k:q[k] for k in ('request_id','question','criterion_ids','parameters') if k in q}
+                              for q in questions if row['facility_id'] in q['facility_ids']]
     education = any(s.get('kind') in ('school', 'academy') for s in shops)
     instructions = INSTRUCTIONS if not education else '''살자리 공공시설 보완 조사기다.
 입력 시설에 대해 요청한 정보만 공개 티스토리 원문에서 직접 검색해 확인한다.
@@ -162,7 +166,8 @@ quote는 직접 읽은 원문의 연속 문구, interpretation은 이에 한정�
 published_date는 실제 작성일, matched_name은 입력 상호, identity_note는 주소/상호 대조 근거다.
 topic은 course/teaching/size/experience 등이다. 없는 정보를 채우지 말고 excerpts=[]로 반환한다.
 '''
-    answer = runner.run(prompt_rules() + instructions + '\n조사 목적: ' + (purpose or '규모·이용 경험 보완')
+    instructions+='\n시설별 questions의 실제 질문/과목/반경/이용 조건만 조사하라. 다른 시설의 질문과 섞지 마라.\n질문을 일반 후기로 대신하거나 인용이 없는데 해결됐다고 주장하지 마라. 개인 신상·연락처·집 위치는 찾지 마라.\n'
+    answer = runner.run(prompt_rules() + instructions + '\n조사 목적: ' + (purpose or ('시설별 questions에 요청한 내용' if questions is not None else '규모·이용 경험 보완'))
                         + "\n입력 JSON:\n" + json.dumps(payload, ensure_ascii=False),
                         ReviewResponse, search=True, domains=DOMAINS, cancel=cancel, retries=0)
     expected = {s["id"]: s for s in shops}

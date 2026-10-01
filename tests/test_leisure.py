@@ -198,6 +198,7 @@ class LeisureTests(unittest.TestCase):
         state=AppState(index(),Runner,leisure_index=leisure(facility()));_,session=state.session()
         p=leisure_profile(settings(include_hobby=True))
         p.context.append(ContextFact(key='safety_research',value='requested',source_quote=p.request))
+        p.context.append(ContextFact(key='safety_research_question',value='침수 피해와 완료된 조치 자료를 찾아줘.',source_quote=p.request))
         # Provide a verified-area test target, separate from real geography.
         with patch.object(state.safety_index,'research_targets',return_value=[{'area_code':'a','area_name':'가상동','topics':['flood']}]),patch('app.web.research_safety',side_effect=RunnerError('timeout')),patch('app.web.research_leisure',return_value={'discoveries':[]}) as hobby:
             run=state.compare(session,CompareInput(profile=p,candidates=candidates()))

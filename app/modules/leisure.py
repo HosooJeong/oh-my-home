@@ -131,7 +131,7 @@ class LeisureIndex:
                 'criterion_id':request['criterion_id'],'registered_detail':r['detail'],'data_date':r['date']} for r in rows[:2])
         chosen={r['criterion_id'] for r in selected_requests}
         unsearched=[{'criterion_id':c.id,'activity_name':c.parameters.get('activity_name') or ACTIVITIES.get(c.parameters.get('activity'),c.label)} for c in active if c.id not in chosen]
-        return {'city':'진주시','areas':areas[:3], 'activities':activities,
+        return {'city':'진주시','areas':areas[:3],'unsearched_areas':areas[3:], 'activities':activities,
                 'activity_names':{a:r['activity_name'] for a,r in single.items()},
                 'forms':{a:r['forms'] for a,r in single.items()},'requests':selected_requests,
                 'registered_leads':selected[:6], 'unsearched_activity_count':len(unsearched),'unsearched_requests':unsearched}
