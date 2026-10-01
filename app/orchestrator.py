@@ -26,7 +26,8 @@ class Orchestrator:
         if any(key != module.id for key, module in self.reference_modules.items()):
             raise ValueError("reference registry key and module id differ")
 
-    def run(self, profile: NeedProfile, candidates: list[Candidate], cancel: Event | None = None) -> dict:
+    def run(self, profile: NeedProfile, candidates: list[Candidate], cancel: Event | None = None,
+            *, include_references: bool = True) -> dict:
         profile = NeedProfile.model_validate(profile.model_dump())
         candidates = [Candidate.model_validate(c.model_dump()) for c in candidates]
         if len({c.id for c in candidates}) != len(candidates) or not candidates:
@@ -79,7 +80,7 @@ class Orchestrator:
             return {**identity, "run_id": run_id, "status": "cancelled", "events": events,
                     "report": None, "modules": results, "questions": []}
         references = []
-        for module_id, module in self.reference_modules.items():
+        for module_id, module in (self.reference_modules.items() if include_references else []):
             try:
                 if hasattr(module, 'reference_requested') and not module.reference_requested(profile):
                     continue

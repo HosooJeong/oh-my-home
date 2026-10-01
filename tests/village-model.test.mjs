@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {CATEGORIES,RADII,emptyDraft,toggleCategory,moveBlock,setLevel,shares,levelForPosition,readDraft,buildRequest,applyVillagePreferences} from '../app/static/village-model.mjs';
+import {CATEGORIES,RADII,emptyDraft,toggleCategory,moveBlock,setLevel,shares,evaluationShares,levelForPosition,readDraft,buildRequest,applyVillagePreferences} from '../app/static/village-model.mjs';
 
 test('five distance levels are invariant under horizontal rotation',()=>{
  for(let i=0;i<RADII.length;i++)for(const angle of [0,.42,1.7,3.5])assert.equal(levelForPosition(Math.cos(angle)*RADII[i],Math.sin(angle)*RADII[i]),i+1);
@@ -10,6 +10,8 @@ test('displayed shares sum to 100% and a single block always has 100%',()=>{
  const d=emptyDraft();for(const c of CATEGORIES)toggleCategory(d,c.id);
  setLevel(d,'living',1);setLevel(d,'transport',2);setLevel(d,'housing',5);
  assert.equal(Math.round(Object.values(shares(d.blocks)).reduce((a,b)=>a+b,0)*10),1000);
+ assert.equal(evaluationShares(d.blocks).housing,0);
+ assert.equal(Math.round(Object.values(evaluationShares(d.blocks)).reduce((a,b)=>a+b,0)*10),1000);
  for(const c of CATEGORIES.slice(1))toggleCategory(d,c.id);
  assert.equal(d.blocks.length,1);assert.equal(shares(d.blocks).living,100);assert.equal(toggleCategory(d,'living'),false);
 });
@@ -42,4 +44,9 @@ test('missing selected categories and reference-only profiles are explicit',()=>
  const d=emptyDraft();toggleCategory(d,'living');assert.deepEqual(applyVillagePreferences({groups:[],criteria:[],questions:[]},d).missing,['living']);
  assert.deepEqual(applyVillagePreferences({groups:[{id:'living',weight:0}],criteria:[{group_id:'living',importance:0}],questions:[]},d).missing,['living']);
  const price=emptyDraft();toggleCategory(price,'housing');assert.equal(applyVillagePreferences({groups:[{id:'housing',weight:100}],criteria:[],questions:[]},price).referenceOnly,true);
+});
+test('three entries remain distinct and private house notes stay out of model input',()=>{
+ for(const entry of ['discover','single','multiple']){const d=emptyDraft();d.entry=entry;d.location='개인 집 메모';toggleCategory(d,'living');assert.equal(readDraft(JSON.stringify(d)).entry,entry);assert.equal(buildRequest(d).includes('개인 집 메모'),entry==='discover');}
+ const old=emptyDraft();old.entry='known';assert.equal(readDraft(JSON.stringify(old)).entry,'multiple');
+ const price=emptyDraft();toggleCategory(price,'housing');const result=applyVillagePreferences({groups:[{id:'housing',weight:0}],criteria:[],questions:[]},price);assert.ok(result.profile);assert.equal(result.referenceOnly,true);
 });

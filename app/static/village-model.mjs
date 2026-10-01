@@ -61,7 +61,7 @@ export function setLevel(draft,id,level){
 export function readDraft(serialized){
  try{
   const saved=JSON.parse(serialized);if(saved?.version!==1||!Array.isArray(saved.blocks))return emptyDraft();
-  const draft=emptyDraft();draft.entry=['known','discover'].includes(saved.entry)?saved.entry:null;draft.location=text(saved.location,200);
+  const draft=emptyDraft();draft.entry=saved.entry==='known'?'multiple':['single','multiple','discover'].includes(saved.entry)?saved.entry:null;draft.location=text(saved.location,200);
   for(const b of saved.blocks.slice(0,6))if(ids.has(b?.id)&&!draft.blocks.some(v=>v.id===b.id)){
    const p=placement(b.x,b.z,draft.blocks);if(p)draft.blocks.push({id:b.id,...p});
   }
@@ -71,14 +71,16 @@ export function readDraft(serialized){
  }catch{return emptyDraft();}
 }
 export function buildRequest(draft){
- const summary=shares(draft.blocks);
- const lines=['진주 주거 생활권을 내 조건으로 검토해 줘.',draft.entry==='known'?'이미 생각한 후보가 있어. 위치는 지도에서 직접 지정할게.':'진주 안에서 생활권부터 탐색하고 싶어.'];
- if(draft.location.trim())lines.push('주소/동네 메모: '+draft.location.trim());
+ const summary=evaluationShares(draft.blocks);
+ const lines=['진주 주거 생활권을 내 조건으로 검토해 줘.',draft.entry==='single'?'집 한 곳의 주변 생활 조건을 분석하고 싶어.':draft.entry==='multiple'?'여러 집의 주변 생활 조건을 비교하고 싶어.':'진주 안에서 생활권부터 탐색하고 싶어.'];
+ // Precise house names/addresses stay in the local map flow, outside model prompts.
+ if(draft.entry==='discover'&&draft.location.trim())lines.push('탐색할 지역: '+draft.location.trim());
  lines.push('아래 카테고리만 선택했어. 중요도는 내가 배치해서 정한 값이며 임의 변경하지 마.');
- for(const b of draft.blocks){const c=CATEGORIES.find(c=>c.id===b.id);lines.push(`${c.label}: 중요도 ${rawWeight(b)}, 상대 비중 ${summary[b.id]}%. ${draft.answers[b.id]?.trim()||'세부 조건은 아직 모르겠어. 필요한 내용만 질문해 줘.'}`);}
+ for(const b of draft.blocks){const c=CATEGORIES.find(c=>c.id===b.id);lines.push(`${c.label}: ${b.id==='housing'?'점수 비중 0, 실거래 참고':`중요도 ${rawWeight(b)}, 상대 비중 ${summary[b.id]}%`}. ${draft.answers[b.id]?.trim()||'세부 조건은 아직 모르겠어. 필요한 내용만 질문해 줘.'}`);}
  if(draft.blocks.some(b=>b.id==='housing'))lines.push('집·비용은 실거래 참고만 필요하고 가격 점수/실제 매물 추천은 제외해 줘.');
  return lines.join('\n');
 }
+export function evaluationShares(blocks){return {...shares(blocks.filter(b=>b.id!=='housing')),...(blocks.some(b=>b.id==='housing')?{housing:0}:{})};}
 export function applyVillagePreferences(profile,draft){
  const selected=new Map(draft.blocks.map(b=>[b.id,b]));
  const missing=draft.blocks.filter(b=>b.id!=='housing'&&(!profile.groups.some(g=>g.id===b.id)||!profile.criteria.some(c=>c.group_id===b.id&&c.importance>0))).map(b=>b.id);
@@ -89,6 +91,6 @@ export function applyVillagePreferences(profile,draft){
  const criterionIds=new Set(copy.criteria.map(c=>c.id));
  copy.questions=copy.questions.filter(q=>!q.criterion_ids.length||q.criterion_ids.some(id=>criterionIds.has(id))).map(q=>({...q,criterion_ids:q.criterion_ids.filter(id=>criterionIds.has(id))}));
  for(const g of copy.groups){g.weight=g.id==='housing'?0:selected.has(g.id)?rawWeight(selected.get(g.id)):0;g.source='user';g.reason=g.id==='housing'?'집·비용은 실거래 참고만':'블록 마을에서 선택한 중요도';}
- if(!copy.groups.some(g=>g.weight>0))return {profile:null,missing:[],referenceOnly:true};
+ if(!copy.groups.some(g=>g.weight>0))return {profile:copy,missing:[],referenceOnly:true};
  return {profile:copy,missing:[],referenceOnly:false};
 }

@@ -40,7 +40,7 @@ STATIC = ROOT / "app/static"
 
 class CompareInput(Contract):
     profile: NeedProfile
-    candidates: Annotated[list[Candidate], Field(min_length=2, max_length=6)]
+    candidates: Annotated[list[Candidate], Field(min_length=1, max_length=6)]
 
 
 class IntakeInput(Contract):
@@ -358,6 +358,9 @@ def make_handler(state, env_path):
                 path = urlsplit(self.path).path
                 files = {"/": (STATIC / "index.html", "text/html; charset=utf-8"),
                          "/workspace": (STATIC / "workspace.html", "text/html; charset=utf-8"),
+                         '/analysis': (STATIC / 'analysis.html', 'text/html; charset=utf-8'),
+                         '/analysis.mjs': (STATIC / 'analysis.mjs', 'text/javascript; charset=utf-8'),
+                         '/analysis.css': (STATIC / 'analysis.css', 'text/css; charset=utf-8'),
                          "/village.css": (STATIC / "village.css", "text/css; charset=utf-8"),
                          "/village.mjs": (STATIC / "village.mjs", "text/javascript; charset=utf-8"),
                          "/village-model.mjs": (STATIC / "village-model.mjs", "text/javascript; charset=utf-8"),
@@ -411,13 +414,16 @@ def make_handler(state, env_path):
 
         def do_POST(self):
             try:
-                self.guard(post=True)
-                _, session = state.session(self.headers.get("X-Session", ""))
                 size = int(self.headers.get("Content-Length", "0"))
                 if not 0 < size <= 131072 or self.headers.get("Transfer-Encoding"):
                     raise ValueError("invalid_body_size")
                 self.connection.settimeout(10)
-                data = json.loads(self.rfile.read(size))
+                # Consume the bounded body before rejecting auth. Unread TCP data can reset
+                # the connection on Windows and hide the intended 403 from the caller.
+                raw = self.rfile.read(size)
+                self.guard(post=True)
+                _, session = state.session(self.headers.get("X-Session", ""))
+                data = json.loads(raw)
                 path = urlsplit(self.path).path
                 if path == "/api/quick":
                     return self.send(200, {"profile": quick_profile(QuickInput.model_validate(data)).model_dump()})

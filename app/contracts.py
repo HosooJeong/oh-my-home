@@ -116,7 +116,7 @@ class NeedProfile(Contract):
     request: Text
     context: list[ContextFact]
     groups: Annotated[list[PreferenceGroup], Field(min_length=1, max_length=20)]
-    criteria: Annotated[list[Criterion], Field(min_length=1, max_length=50)]
+    criteria: Annotated[list[Criterion], Field(max_length=50)]
     questions: Annotated[list[Question], Field(max_length=10)]
 
     @model_validator(mode="after")
@@ -133,11 +133,13 @@ class NeedProfile(Contract):
             raise ValueError("criterion references an unknown group")
         if any(set(q.criterion_ids) - criteria for q in self.questions):
             raise ValueError("question references an unknown criterion")
-        if sum(g.weight for g in self.groups) <= 0:
+        reference_only = (not self.criteria and all(g.id == 'housing' and g.weight == 0 for g in self.groups)
+                          and any(c.key == 'housing_reference' and c.value == 'requested' for c in self.context))
+        if sum(g.weight for g in self.groups) <= 0 and not reference_only:
             raise ValueError("at least one group must have positive weight")
         for g in self.groups:
             assigned = [c for c in self.criteria if c.group_id == g.id]
-            if not assigned or (g.weight > 0 and sum(c.importance for c in assigned) <= 0):
+            if (not assigned and not (g.id == 'housing' and g.weight == 0)) or (g.weight > 0 and sum(c.importance for c in assigned) <= 0):
                 raise ValueError("each active group needs a weighted criterion")
         return self
 

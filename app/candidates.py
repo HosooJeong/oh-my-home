@@ -2,7 +2,7 @@
 import hashlib
 import json
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field
 
@@ -12,6 +12,19 @@ from .evaluation import weights
 from .geo import distance_m
 from .modules.living import METRICS
 from .modules.transport import METRIC
+from .modules.education import SCHOOL_METRIC, ACADEMY_METRIC
+from .modules.leisure import PARK_METRIC, LIBRARY_METRIC, MEETING_METRIC
+
+
+def execution_plan(profile):
+    normalized = weights(profile)
+    queryable = {'living':set(METRICS), 'transport':{METRIC},
+                 'education':{SCHOOL_METRIC, ACADEMY_METRIC},
+                 'leisure':{PARK_METRIC, LIBRARY_METRIC, MEETING_METRIC}}
+    return [dict(criterion_id=c.id, label=c.label, module_id=c.module_id, weight=normalized[c.id],
+                 role='query' if c.metric in queryable.get(c.module_id, set()) and c.utility else 'unverified',
+                 hard=c.hard is not None)
+            for c in profile.criteria if normalized[c.id] > 0 or c.hard]
 
 
 class GenerationInput(Contract):
@@ -19,6 +32,7 @@ class GenerationInput(Contract):
     count: Annotated[int, Field(ge=2, le=6)] = 3
     separation_m: Annotated[float, Field(ge=0, le=5000, allow_inf_nan=False)] = 1000.0
     area_codes: Annotated[list[str], Field(max_length=30)] = []
+    mode: Literal['strict', 'exploratory'] = 'strict'
 
 
 class CandidatePool:
@@ -72,11 +86,10 @@ class CandidatePool:
             return {**base, "status": "needs_input", "reason": "먼저 비교에 필요한 인터뷰 답변을 반영해 줘."}
         w = weights(data.profile)
         active = [c for c in data.profile.criteria if w[c.id] > 0 or c.hard]
-        unsupported = [c.label for c in active if not c.utility or c.utility.unit != "m"
-            or c.utility.direction != "lower" or not (
-                c.module_id == "living" and c.metric in METRICS
-                or c.module_id == "transport" and c.metric == METRIC)]
-        if unsupported:
+        plan = execution_plan(data.profile)
+        base.update(execution_plan=plan, selection_mode=data.mode)
+        unsupported = [p['label'] for p in plan if p['role'] == 'unverified']
+        if unsupported and (data.mode == 'strict' or any(p['hard'] and p['role'] == 'unverified' for p in plan)):
             return {**base, "status": "unsupported", "reason": "자동 선별에 필요한 조건의 근거가 아직 없어: " + ", ".join(unsupported)}
         if any(g.weight > 0 and g.source == "proposed" for g in data.profile.groups) or any(
                 w[c.id] > 0 and (c.source == "proposed" or c.importance_source == "proposed") for c in active):
@@ -85,19 +98,22 @@ class CandidatePool:
         base["searched_count"] = len(points)
         if not points:
             return {**base, "status": "empty", "reason": "선택한 범위에 준비된 분석 지점이 없어."}
-        run = orchestrator.run(data.profile, [p["candidate"] for p in points])
+        run = orchestrator.run(data.profile, [p["candidate"] for p in points], include_references=False)
         if not run["report"] or any(q["blocking"] for q in run["questions"]):
             return {**base, "status": "needs_input", "reason": "비교에 필요한 조건을 먼저 확인해 줘."}
         assessments = run["report"]["assessments"]
-        eligible = [a for a in assessments if a["eligibility"] == "eligible" and a["score"] is not None]
-        eligible.sort(key=lambda a: (-a["score"], a["candidate_id"]))
+        eligible = [a for a in assessments if a["eligibility"] == "eligible"
+                    and (a["score"] is not None or data.mode == 'exploratory')]
+        # Keep original weights and sort the confirmed contribution; unknowns remain unknown.
+        eligible.sort(key=lambda a: (-a['score_range'][0], -a['coverage'], a["candidate_id"]))
         selected = []
         for assessment in eligible:
             point = self.points[assessment["candidate_id"]]
             c = point["candidate"]
             if all(distance_m(c.latitude, c.longitude, other["candidate"].latitude,
                               other["candidate"].longitude) >= data.separation_m for other in selected):
-                selected.append({**point, "score": assessment["score"]})
+                selected.append({**point, "score": assessment["score"], 'score_range':assessment['score_range'],
+                                 'coverage':assessment['coverage']})
             if len(selected) == data.count:
                 break
         base.update(eligible_count=len(eligible),
@@ -108,10 +124,15 @@ class CandidatePool:
             source_candidate_fingerprint=run["candidates_fingerprint"],
             module_requests=[{"module_id": m["module_id"], "request_fingerprint": m["request_fingerprint"],
                               "evidence_count": len(m["evidence"])} for m in run["modules"]])
+        partial = any(p['score'] is None for p in selected)
+        base.update(ranking_status='withheld' if partial else run['report']['ranking_status'],
+                    unverified_criteria=[p for p in plan if p['role'] == 'unverified'])
         return {**base, "status": "completed" if len(selected) == data.count else "limited" if selected else "empty",
                 "reason": "전체 근거가 확인되고 필수조건을 통과한 지점에서 적합도 순으로, 지정한 간격을 유지해 골랐어."
+                    if selected and not partial else "확인된 기여가 큰 탐색 지점을 골랐어. 미확인 조건의 비중을 유지하며 전체 순위는 보류해."
                     if selected else "필수조건 탈락 또는 근거 미확인으로 선별할 지점이 없어. 조건과 자료 범위를 확인해 줘.",
                 "candidates": [p["candidate"].model_dump() for p in selected],
                 "selected": [{"candidate_id": p["candidate"].id, "score": p["score"],
+                              "score_range": p['score_range'], "coverage":p['coverage'],
                               "area_code": p["area_code"], "cell": p["cell"],
                               "registered_shop_count": p["registered_shop_count"]} for p in selected]}

@@ -1,4 +1,4 @@
-import {CATEGORIES,STORAGE_KEY,RADII,readDraft,shares,levelForPosition,toggleCategory,moveBlock} from './village-model.mjs';
+import {CATEGORIES,STORAGE_KEY,RADII,readDraft,evaluationShares as shares,levelForPosition,toggleCategory,moveBlock} from './village-model.mjs';
 import {createToyModels,addToyStudio} from './village-models.mjs';
 
 const $=id=>document.getElementById(id);
@@ -10,6 +10,7 @@ const buttons=new Map();
 // Original SVG line icons share one stroke and never depend on font glyphs.
 const ICONS={
  home:['M3 10 12 3l9 7','M5 9v12h14V9','M9 21v-7h6v7'],
+ houses:['M2 12 8 7l6 5','M4 11v10h8V11','M12 7l5-4 5 4','M14 6v9h6V6'],
  search:['M16 16l5 5','M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0'],
  'arrow-left':['M20 12H4','m10 6-6 6 6 6'],
  'arrow-right':['M4 12h16','m14 6 6 6-6 6'],
@@ -54,11 +55,12 @@ function render(){
  $('town-tools').hidden=mode!=='town';$('detail-panel').hidden=!['detail','review'].includes(mode);
  $('question-view').hidden=mode!=='detail';$('review-view').hidden=mode!=='review';
  $('change-start').hidden=mode!=='town';$('scene-controls').hidden=mode!=='town';
- $('location-title').textContent=draft.entry==='discover'?'어느 생활권에서 찾을까?':'어느 동네를 생각해?';
- $('location-label').textContent=draft.entry==='discover'?'진주 안에서 찾을 지역':'후보 주소·동네';
+ $('location-title').textContent=draft.entry==='discover'?'어느 생활권에서 찾을까?':draft.entry==='single'?'어느 집을 분석할까?':'어느 집들을 비교할까?';
+ $('location-label').textContent=draft.entry==='discover'?'진주 안에서 찾을 지역':'집 이름·동네 메모';
+ $('location-input').placeholder=draft.entry==='discover'?'예: 진주 전체, 평거동':'예: 평거동의 집 · 위치는 지도에서 선택';
  $('location-input').value=draft.location;
  const percentages=shares(draft.blocks);
- for(const c of CATEGORIES){const button=buttons.get(c.id),active=draft.blocks.some(b=>b.id===c.id);button.setAttribute('aria-pressed',String(active));button.disabled=active&&draft.blocks.length===1;button.setAttribute('aria-label',c.label+(active?`, 배치 비중 ${percentages[c.id]}%`:''));}
+ for(const c of CATEGORIES){const button=buttons.get(c.id),active=draft.blocks.some(b=>b.id===c.id);button.setAttribute('aria-pressed',String(active));button.disabled=active&&draft.blocks.length===1;button.setAttribute('aria-label',c.label+(active?(c.id==='housing'?', 실거래 참고':`, 반영 비중 ${percentages[c.id]}%`):''));}
  $('open-details').disabled=!draft.blocks.length||!world?.available;
  if(mode==='detail'){
   const c=CATEGORIES.find(c=>c.id===order[step]);draft.focus=c.id;
@@ -67,7 +69,7 @@ function render(){
   $('question-prev').hidden=step===0;$('question-next-label').textContent=step===order.length-1?'입력 확인':'다음';
  }else if(mode==='review'){
   $('question-progress').textContent=`${order.length}/${order.length}`;$('answer-summary').replaceChildren();
-  for(const id of order){const c=CATEGORIES.find(c=>c.id===id),row=document.createElement('div');row.className='answer-item';const name=document.createElement('strong'),percent=document.createElement('span'),answer=document.createElement('p');name.textContent=c.label;percent.textContent=percentages[id]+'%';name.append(percent);answer.textContent=draft.answers[id]?.trim()||'아직 모르겠어';row.append(name,answer);$('answer-summary').append(row);}
+  for(const id of order){const c=CATEGORIES.find(c=>c.id===id),row=document.createElement('div');row.className='answer-item';const name=document.createElement('strong'),percent=document.createElement('span'),answer=document.createElement('p');name.textContent=c.label;percent.textContent=id==='housing'?'참고':percentages[id]+'%';name.append(percent);answer.textContent=draft.answers[id]?.trim()||'아직 모르겠어';row.append(name,answer);$('answer-summary').append(row);}
  }
  world?.sync();expose();
 }
@@ -83,7 +85,7 @@ function nextQuestion(){if(step<order.length-1)step++;else mode='review';save();
 $('question-next').addEventListener('click',nextQuestion);
 $('question-prev').addEventListener('click',()=>{step=Math.max(0,step-1);render();});
 $('question-unknown').addEventListener('click',()=>{draft.answers[order[step]]='';nextQuestion();});
-$('continue-workspace').addEventListener('click',()=>{if(mode!=='review')return;draft.handoff=true;save();location.assign('/workspace');});
+$('continue-workspace').addEventListener('click',()=>{if(mode!=='review')return;draft.handoff=true;save();location.assign('/analysis');});
 $('turn-left').addEventListener('click',()=>world?.rotate(-Math.PI/4));$('turn-right').addEventListener('click',()=>world?.rotate(Math.PI/4));
 $('zoom-in').addEventListener('click',()=>world?.zoom(1.15));$('zoom-out').addEventListener('click',()=>world?.zoom(1/1.15));
 document.addEventListener('keydown',event=>{if(mode==='town'&&event.key.toLowerCase()==='f'&&!['INPUT','TEXTAREA'].includes(event.target.tagName)){if(document.fullscreenElement)document.exitFullscreen?.();else $('scene-wrap').requestFullscreen?.();}});
@@ -135,7 +137,7 @@ function createWorld(T){
  function sync(){
   const percentages=shares(draft.blocks);
   for(const c of CATEGORIES){const g=models.get(c.id),b=draft.blocks.find(v=>v.id===c.id),item=labels.get(c.id);g.visible=!!b;item.label.hidden=!b;
-   if(b){g.position.x=b.x;g.position.z=b.z;item.percentage.textContent=percentages[c.id]+'%';item.label.classList.toggle('active',draft.focus===c.id);}}
+   if(b){g.position.x=b.x;g.position.z=b.z;item.percentage.textContent=c.id==='housing'?'참고':percentages[c.id]+'%';item.label.classList.toggle('active',draft.focus===c.id);}}
   const selected=draft.blocks.find(b=>b.id===draft.focus);highlight.visible=!!selected&&!['start','location'].includes(mode);if(selected)highlight.position.set(selected.x,.2,selected.z);
   guide.visible=!!drag?.id;resize();
  }

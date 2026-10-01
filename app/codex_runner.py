@@ -195,6 +195,10 @@ class CodexRunner:
             try:
                 return response_type.model_validate_json(output_file.read_text(encoding="utf-8"))
             except (ValidationError, ValueError, UnicodeError) as error:
+                if isinstance(error, ValidationError):
+                    self.last_metadata['validation_errors'] = [
+                        {'location':list(item['loc']), 'type':item['type']}
+                        for item in error.errors(include_input=False, include_context=False)[:10]]
                 raise RunnerError("invalid_response") from error
 
     @staticmethod

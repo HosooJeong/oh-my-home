@@ -6,6 +6,8 @@ M4는 [학교급/과목별 교육 조회](../docs/education-accessibility.md)를
 
 M6 `leisure`는 [공원/도서관·사용자 지정 지점의 거리](../docs/leisure-accessibility.md)를 비교한다. `hobby_suitability`의 중요도/종목·이용 형태는 보존하고 점수 미지원으로 남긴다. 요청된 사설 취미 후보의 직접 웹검색은 메인 보완 작업으로 실행해 원문·날짜·지점/주소·종목을 검사하고 점수와 분리한다. 사용자 지점은 `Evidence.source_kind=user`로 구분하며 가짜 외부 URL을 만들지 않는다. 공공 근거의 출처 검증과 재가중치의 근거 재사용은 유지한다.
 
+10/1 후속: 니즈 정리는 간결한 `IntakeDraft`를 생성하고 앱이 원문/정체성을 복원한다. 집·비용 참고만 있는 계약을 허용하고 공통 후보 계획·3개 진입/단독·새 지도 결과를 연결했다. [새 흐름과 제한](../docs/analysis-flow.md)을 따른다.
+
 ## 실행
 
 Python 3.11 이상, `pip install -r requirements.txt`. 검증 환경은 Windows/Python 3.13.3/Pydantic 2.12.5다. 지도 표본 도구의 기존 Python 표준 라이브러리 실행도 유지된다.
