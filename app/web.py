@@ -436,6 +436,7 @@ def make_handler(state, env_path):
                          "/workspace": (STATIC / "workspace.html", "text/html; charset=utf-8"),
                          '/analysis': (STATIC / 'analysis.html', 'text/html; charset=utf-8'),
                          '/analysis.mjs': (STATIC / 'analysis.mjs', 'text/javascript; charset=utf-8'),
+                         '/analysis-view.mjs': (STATIC / 'analysis-view.mjs', 'text/javascript; charset=utf-8'),
                          '/analysis.css': (STATIC / 'analysis.css', 'text/css; charset=utf-8'),
                          "/village.css": (STATIC / "village.css", "text/css; charset=utf-8"),
                          "/village.mjs": (STATIC / "village.mjs", "text/javascript; charset=utf-8"),
