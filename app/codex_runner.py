@@ -67,6 +67,11 @@ class CodexRunner:
         self.timeout = timeout
         self.model = model
         self.last_metadata = {}
+        self.on_debug_event = None
+
+    def debug_event(self, role, content, **details):
+        if self.on_debug_event:
+            self.on_debug_event(role, content, **details)
 
     def version(self) -> str:
         try:
@@ -151,6 +156,7 @@ class CodexRunner:
         started = time.monotonic()
         self.last_metadata = {"search_mode": "live" if search else "disabled",
                               "requested_model": self.model, "cli_version": self.version()}
+        self.debug_event('AI 요청', prompt, response_type=response_type.__name__, search=search)
         if cancel.is_set():
             raise RunnerError("cancelled")
         with tempfile.TemporaryDirectory(prefix="saljari-codex-") as temp:
@@ -187,19 +193,37 @@ class CodexRunner:
             if cancel.is_set():
                 raise RunnerError("cancelled")
             self.last_metadata["exit_code"] = process.returncode
+            if self.on_debug_event and output_file.exists() and output_file.stat().st_size <= 1_000_000:
+                self.debug_event('AI 최종 응답', output_file.read_bytes().decode('utf-8', errors='replace'), response_type=response_type.__name__)
+            else:
+                self.debug_cli_events(stdout, include_messages=True)
+            self.debug_cli_events(stdout)
             self.last_metadata.update(self._events(stdout, search))
             if process.returncode != 0:
                 raise RunnerError(classify_error((stderr + stdout).decode("utf-8", errors="replace")))
             if not output_file.exists() or output_file.stat().st_size > 1_000_000:
                 raise RunnerError("missing_or_oversized_result")
             try:
-                return response_type.model_validate_json(output_file.read_text(encoding="utf-8"))
+                return response_type.model_validate_json(output_file.read_text(encoding='utf-8'))
             except (ValidationError, ValueError, UnicodeError) as error:
                 if isinstance(error, ValidationError):
                     self.last_metadata['validation_errors'] = [
                         {'location':list(item['loc']), 'type':item['type']}
                         for item in error.errors(include_input=False, include_context=False)[:10]]
                 raise RunnerError("invalid_response") from error
+
+    def debug_cli_events(self, raw, include_messages=False):
+        if not self.on_debug_event:
+            return
+        for line in raw.decode('utf-8', errors='replace').splitlines():
+            try:
+                event = json.loads(line)
+            except ValueError:
+                continue
+            if event.get('type') in ('error', 'turn.failed'):
+                self.debug_event('CLI 오류', event.get('error') or {'message': event.get('message')})
+            elif include_messages and event.get('type') == 'item.completed' and event.get('item', {}).get('type') == 'agent_message':
+                self.debug_event('AI 반환 메시지', event['item'].get('text', ''))
 
     @staticmethod
     def _events(raw: bytes, search: bool) -> dict:

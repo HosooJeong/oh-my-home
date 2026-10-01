@@ -16,6 +16,7 @@ from .codex_runner import CodexRunner, RunnerError
 from .contracts import Candidate, Contract, InterviewTurn, NeedProfile, Weight, digest
 from .candidates import CandidatePool, GenerationInput
 from .intake import prepare_profile
+from .debug_transcript import DebugTranscripts
 from .reviews import ReviewInput, map_links, research_reviews
 from .research_plan import build_research_plan, evidence_status
 from .preference_edits import PreservationError, edited, edit_quote, preserve_need
@@ -126,7 +127,7 @@ class HousingProfileInput(Contract):
 
 
 class AppState:
-    def __init__(self, index, runner_factory=CodexRunner, stop_index=None, candidate_pool=None, housing_index=None, education_index=None, safety_index=None, leisure_index=None):
+    def __init__(self, index, runner_factory=CodexRunner, stop_index=None, candidate_pool=None, housing_index=None, education_index=None, safety_index=None, leisure_index=None, debug_transcripts=None):
         self.index, self.runner_factory = index, runner_factory
         self.candidate_pool = candidate_pool
         self.stop_index = stop_index if stop_index is not None else StopIndex({"generated_at": "unavailable", "records": []})
@@ -140,6 +141,15 @@ class AppState:
                                         'safety':self.safety,'leisure':LeisureModule(self.leisure_index)}, reference_modules={"housing": self.housing, 'safety':self.safety})
         self.lock, self.sessions = Lock(), {}
         self.active_job = None
+        self.debug_transcripts = debug_transcripts
+
+    def record(self, session, role, content, **details):
+        if self.debug_transcripts and session.get('debug_path'):
+            try:
+                self.debug_transcripts.append(session['debug_path'], role, content, **details)
+            except OSError:
+                # A diagnostic write must not turn a successful analysis into a failure.
+                print('Debug transcript write failed.', flush=True)
 
     def session(self, token=None):
         with self.lock:
@@ -152,7 +162,8 @@ class AppState:
                     raise RuntimeError("busy")
                 token = secrets.token_urlsafe(32)
                 self.sessions[token] = {"touched": now, "jobs": {}, "comparison": None,
-                                        "review_job": None, "review_key": None, "lock": Lock()}
+                                        "review_job": None, "review_key": None, "lock": Lock(),
+                                        'debug_path': self.debug_transcripts.start() if self.debug_transcripts else None}
             if token not in self.sessions:
                 raise PermissionError("session_expired")
             result = self.sessions[token]
@@ -211,7 +222,9 @@ class AppState:
         def work():
             runner = None
             try:
+                self.record(session, '사용자 요청', data.model_dump(), job=job['id'], kind=kind)
                 runner = self.runner_factory()
+                runner.on_debug_event = lambda role, content, **details: self.record(session, role, content, job=job['id'], **details)
                 result = execute(runner, job["cancel"])
                 with session["lock"], self.lock:
                     job["metadata"] = runner.last_metadata
@@ -234,6 +247,8 @@ class AppState:
                 with self.lock:
                     job["metadata"] = runner.last_metadata if runner else None
                     self.active_job = None
+                self.record(session, '작업 종료', {'status':job['status'], 'error':job['error'], 'metadata':job['metadata'],
+                            'profile':job['profile'], 'result':job['result']}, job=job['id'], kind=kind)
         Thread(target=work, daemon=True).start()
         return self.public_job(job)
 
@@ -437,6 +452,8 @@ def make_handler(state, env_path):
                          '/analysis': (STATIC / 'analysis.html', 'text/html; charset=utf-8'),
                          '/analysis.mjs': (STATIC / 'analysis.mjs', 'text/javascript; charset=utf-8'),
                          '/analysis-view.mjs': (STATIC / 'analysis-view.mjs', 'text/javascript; charset=utf-8'),
+                         '/entry-places.mjs': (STATIC / 'entry-places.mjs', 'text/javascript; charset=utf-8'),
+                         '/debug-session.mjs': (STATIC / 'debug-session.mjs', 'text/javascript; charset=utf-8'),
                          '/analysis.css': (STATIC / 'analysis.css', 'text/css; charset=utf-8'),
                          "/village.css": (STATIC / "village.css", "text/css; charset=utf-8"),
                          "/village.mjs": (STATIC / "village.mjs", "text/javascript; charset=utf-8"),
@@ -467,8 +484,9 @@ def make_handler(state, env_path):
                 if path == "/api/config":
                     return self.send(200, {"javascriptKey": sdk_key(env_path)})
                 if path == "/api/bootstrap":
-                    token, _ = state.session()
-                    return self.send(200, {"token": token, "data": {**state.index.metadata(),
+                    token, session = state.session(self.headers.get('X-Session') or None)
+                    return self.send(200, {"token": token, 'debug_enabled': bool(state.debug_transcripts),
+                        'debug_session': session['debug_path'].stem if session.get('debug_path') else None, "data": {**state.index.metadata(),
                         "transport": state.stop_index.metadata(), "housing": state.housing.index.metadata(),
                         'education': state.education_index.metadata(),
                         'safety':state.safety_index.metadata(),
@@ -502,6 +520,11 @@ def make_handler(state, env_path):
                 _, session = state.session(self.headers.get("X-Session", ""))
                 data = json.loads(raw)
                 path = urlsplit(self.path).path
+                if path == '/api/debug-event':
+                    if set(data) != {'event','data'} or data['event'] not in ('entry_selected','candidates_confirmed','category_answer','village_confirmed','conditions_confirmed','analysis_error','comparison_result'):
+                        raise ValueError('invalid_debug_event')
+                    state.record(session, '화면 대화', data['data'], event=data['event'])
+                    return self.send(200, {'enabled':bool(state.debug_transcripts)})
                 if path == "/api/quick":
                     return self.send(200, {"profile": quick_profile(QuickInput.model_validate(data)).model_dump()})
                 if path == "/api/transport-profile":
@@ -539,7 +562,10 @@ def make_handler(state, env_path):
                             job["cancel"].set()
                         return self.send(200, state.public_job(job))
                 if path == "/api/compare":
-                    return self.send(200, state.compare(session, CompareInput.model_validate(data)))
+                    state.record(session, '후보 비교 요청', data)
+                    result = state.compare(session, CompareInput.model_validate(data))
+                    state.record(session, '후보 비교 결과', result)
+                    return self.send(200, result)
                 if path == "/api/preferences":
                     return self.send(200, state.preferences(session, PreferenceInput.model_validate(data)))
                 return self.send(404, {"error": "not_found"})
@@ -568,7 +594,12 @@ def main():
     parser.add_argument('--education', type=Path, default=ROOT / 'data/processed/education.json')
     parser.add_argument('--leisure', type=Path, default=ROOT / 'data/processed/leisure.json')
     parser.add_argument('--quarantine', type=Path, default=ROOT / 'data/processed/quarantine.json')
+    parser.add_argument('--debug-transcripts', type=Path, nargs='?',
+                        const=ROOT.parent / 'work/saljari-private/debug-sessions',
+                        help='Opt-in local test conversation files, outside the code repository.')
     args = parser.parse_args()
+    if args.debug_transcripts and args.debug_transcripts.resolve().is_relative_to(ROOT.resolve()):
+        parser.error('--debug-transcripts must be outside the code repository')
     sdk_key(args.env_file)
     document = json.loads(args.inventory.read_text(encoding="utf-8"))
     pool = None
@@ -600,10 +631,13 @@ def main():
     except (OSError,ValueError,KeyError,TypeError):
         print('Leisure public data unavailable: prepare verified park/library snapshots.',flush=True)
     state = AppState(ShopIndex(document), stop_index=StopIndex(document), candidate_pool=pool,
-                     housing_index=housing, education_index=education, safety_index=safety,leisure_index=leisure)
+                     housing_index=housing, education_index=education, safety_index=safety,leisure_index=leisure,
+                     debug_transcripts=DebugTranscripts(args.debug_transcripts) if args.debug_transcripts else None)
     server = ThreadingHTTPServer((args.host, args.port), make_handler(state, args.env_file))
     server.daemon_threads = True
     print(f"Saljari M1/M2/M3/M4/M5/M6: http://localhost:{args.port} (bind {args.host})", flush=True)
+    if args.debug_transcripts:
+        print(f'Test transcripts enabled: {args.debug_transcripts.resolve()}', flush=True)
     server.serve_forever()
 
 

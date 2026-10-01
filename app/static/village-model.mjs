@@ -1,4 +1,5 @@
 // Preference logic has no dependency on cameras or Three.js meshes.
+import {readCandidates} from './entry-places.mjs';
 export const STORAGE_KEY='saljari.village.v1';
 export const CATEGORIES=Object.freeze([
  {id:'living',label:'생활·건강',short:'생활',color:'#e49375',angle:-150,question:'장보기와 일상에서 가까웠으면 하는 곳은?',placeholder:'큰 마트에서 자주 장을 봐. 걸어서 10분 정도면 좋겠어.'},
@@ -25,7 +26,7 @@ export function shares(blocks){
  values.slice().sort((a,b)=>b.remainder-a.remainder||a.id.localeCompare(b.id)).slice(0,remaining).forEach(v=>v.value++);
  return Object.fromEntries(values.map(v=>[v.id,v.value/10]));
 }
-export function emptyDraft(){return {version:1,entry:null,location:'',blocks:[],answers:{},focus:null,handoff:false};}
+export function emptyDraft(){return {version:1,entry:null,location:'',candidates:[],blocks:[],answers:{},focus:null,handoff:false};}
 export function placement(x,z,others=[]){
  if(!Number.isFinite(x)||!Number.isFinite(z))return null;
  let radius=Math.hypot(x,z),angle=radius?Math.atan2(z,x):0;
@@ -62,6 +63,7 @@ export function readDraft(serialized){
  try{
   const saved=JSON.parse(serialized);if(saved?.version!==1||!Array.isArray(saved.blocks))return emptyDraft();
   const draft=emptyDraft();draft.entry=saved.entry==='known'?'multiple':['single','multiple','discover'].includes(saved.entry)?saved.entry:null;draft.location=text(saved.location,200);
+  draft.candidates=readCandidates(saved.candidates);
   for(const b of saved.blocks.slice(0,6))if(ids.has(b?.id)&&!draft.blocks.some(v=>v.id===b.id)){
    const p=placement(b.x,b.z,draft.blocks);if(p)draft.blocks.push({id:b.id,...p});
   }

@@ -75,3 +75,18 @@ label{display:block}input,textarea{width:100%;border:1px solid var(--line);backg
  .village-page [data-mode=start] .scene-heading{left:22px;top:22px}.village-page .floating-panel{top:56%}
 }
 @media(prefers-reduced-motion:reduce){.village-page .block-label{transition:none}}
+
+/* Confirm real houses before entering the building board. */
+.entry-location{max-width:1100px;margin:10px auto 0;padding:20px 16px 40px}
+.entry-location h1{margin:12px 0 28px;font-size:30px}
+.entry-location-grid{display:grid;grid-template-columns:minmax(260px,360px) minmax(0,1fr);gap:32px;align-items:start}
+.entry-location-search{min-width:0}.entry-location label{font-size:14px;margin:14px 0 8px}
+.address-search-row,.coordinate-row{display:flex;gap:8px}.address-search-row input{min-width:0;flex:1}.address-search-row button{width:54px;padding:12px;flex-shrink:0}
+.coordinate-row label{min-width:0;flex:1}.location-note{color:var(--muted);font-size:13px;line-height:1.7;overflow-wrap:anywhere}
+#entry-map{height:480px;border-radius:22px;overflow:hidden;background:#e5ecdf;position:relative}#entry-map-fallback{padding:24px;line-height:1.7}
+#address-results{display:grid;gap:8px}#address-results button{text-align:left;justify-content:flex-start;line-height:1.6;overflow-wrap:anywhere}
+#entry-place-list{list-style:none;padding:0;margin:20px 0 8px}#entry-place-list li{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding:10px 0;font-size:14px}#entry-place-list span{flex:1;overflow-wrap:anywhere}#entry-place-list button{border:0;background:transparent;width:44px;padding:10px;flex-shrink:0}
+#entry-coordinate{margin:20px 0;font-size:13px;color:var(--muted)}#entry-coordinate summary{cursor:pointer;min-height:28px}#entry-coordinate button{margin-top:12px}
+#map-pick{margin-top:12px;padding:12px 0;line-height:1.7}#map-pick p{font-size:14px}
+#discover-location{max-width:420px}#enter-town{margin-top:24px;min-height:50px}
+@media(max-width:740px){.entry-location{padding:12px 8px 90px}.entry-location h1{font-size:26px;margin:10px 0 24px}.entry-location-grid{grid-template-columns:minmax(0,1fr);gap:20px}#entry-map{height:330px;grid-row:2;z-index:0}#enter-town{position:fixed;bottom:16px;left:18px;width:calc(100% - 36px);margin:0;z-index:2;box-shadow:0 4px 18px #263d3430}}
