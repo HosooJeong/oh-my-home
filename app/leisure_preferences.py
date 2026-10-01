@@ -3,6 +3,7 @@ from typing import Annotated, Literal
 from pydantic import Field, model_validator
 from .contracts import Contract, NeedProfile, Weight
 from .modules.leisure import PARK_METRIC, LIBRARY_METRIC, MEETING_METRIC, HOBBY_METRIC, ACTIVITIES
+from .preference_edits import edited, replace_context, preserve_need, edit_quote, PreservationError
 
 Distance = Annotated[float, Field(ge=0, le=20000, allow_inf_nan=False)]
 
@@ -28,6 +29,7 @@ class LeisureInput(Contract):
     activity_form: Annotated[str, Field(max_length=100)]
     hobby_importance: Weight
     group_weight: Weight
+    edited_fields: Annotated[list[str], Field(max_length=25)] | None = None
 
     @model_validator(mode='after')
     def consistent(self):
@@ -39,6 +41,7 @@ class LeisureInput(Contract):
 
 
 def leisure_profile(data):
+    if data.profile and data.edited_fields == []: return data.profile.model_copy(deep=True)
     doc = data.profile.model_dump() if data.profile else {'schema_version':'1','revision':0,'request':'','context':[], 'groups':[], 'criteria':[], 'questions':[]}
     doc['revision']+=1
     park={'any':'전체 도시공원','children':'어린이공원','neighborhood':'근린공원'}[data.park_type] if data.include_park else '평가 제외'
@@ -51,11 +54,14 @@ def leisure_profile(data):
         f'공원/도서관/만남/취미 중요도 {data.park_importance:g}/{data.library_importance:g}/{data.meeting_importance:g}/{data.hobby_importance:g}, '
         f'여가 분야 중요도 {data.group_weight:g}. '
         +('사설 취미시설 후보와 이용 형태를 웹으로 보완해 줘.' if data.include_hobby else '취미시설 웹 조사 요청 없음.'))
-    doc['request']=(doc['request']+'\n'+quote).strip()
+    quote = edit_quote(data, quote)
+    if quote: doc['request']=(doc['request']+'\n'+quote).strip()
     context={'leisure_research':'requested' if data.include_hobby and data.hobby_importance>0 else 'disabled'}
-    doc['context']=[c for c in doc['context'] if c['key'] not in context]
-    doc['context'].extend({'key':k,'value':v,'source_quote':quote} for k,v in context.items())
+    replace_context(doc,context if edited(data,'include_hobby','hobby_importance') else {},quote)
     distance={'direction':'lower','ideal':data.ideal,'limit':data.limit,'unit':'m'}
+    first_distance=next((c['utility'] for metric in (PARK_METRIC,LIBRARY_METRIC,MEETING_METRIC)
+                         for c in doc['criteria'] if c['metric']==metric and c['module_id']=='leisure' and c['utility']),None)
+    distance_changed=edited(data,'ideal','limit') and (data.edited_fields is not None or first_distance!=distance)
     specs=[(PARK_METRIC,data.include_park,'공원 접근성',data.park_importance,distance,{'park_type':data.park_type}),
            (LIBRARY_METRIC,data.include_library,'도서관 접근성',data.library_importance,distance,{'library_type':data.library_type}),
            (MEETING_METRIC,data.include_meeting,'지정 만남 지점 접근성',data.meeting_importance,distance,
@@ -72,14 +78,29 @@ def leisure_profile(data):
                 identity='leisure_'+str(number)
                 while any(c['id']==identity for c in doc['criteria']): identity+='_x'
                 criterion={'id':identity,'module_id':'leisure','group_id':'leisure'}; doc['criteria'].append(criterion)
-            criterion.update(metric=metric,label=label,need=quote,source_quote=quote,source='user',importance=importance,
-                importance_source='user',utility=utility,parameters=parameters,hard=None)
-        elif criterion: criterion.update(importance=0.0,importance_source='user',source='user',source_quote=quote,hard=None)
-        if criterion:
+                criterion.update(metric=metric,label=label,need=quote,source_quote=quote,source='user',importance=importance,
+                    importance_source='user',utility=utility,parameters=parameters,hard=None)
+            else:
+                importance_field=('park_importance','library_importance','meeting_importance','hobby_importance')[number]
+                values={}
+                if edited(data,importance_field): values.update(importance=importance,importance_source='user')
+                if number<3 and distance_changed:
+                    if criterion['utility'] and (criterion['utility']['unit']!='m' or criterion['utility']['direction']!='lower'):
+                        raise PreservationError('기존 여가 이동 기준은 직선거리와 달라. 원래 조건을 유지했어.')
+                    values['utility']=utility
+                values['parameters']=dict(criterion['parameters'])
+                values['parameters'].update({k:v for k,v in parameters.items() if edited(data,k)})
+                if values['parameters'] != criterion['parameters']:
+                    values.update(label=label,need=criterion['need']+'\n현재 조회조건: '+quote)
+                preserve_need(criterion,values,quote)
+        elif criterion and edited(data,('include_park','include_library','include_meeting','include_hobby')[number]):
+            criterion.update(importance=0.0,importance_source='user',source='user',source_quote=quote,hard=None)
+        if criterion and not enabled and edited(data,('include_park','include_library','include_meeting','include_hobby')[number]):
             doc['questions']=[q for q in doc['questions'] if q['criterion_ids'] != [criterion['id']]]
     members=[c for c in doc['criteria'] if c['group_id']=='leisure']
     if members:
         group=next((g for g in doc['groups'] if g['id']=='leisure'),None)
         if group is None: group={'id':'leisure','label':'여가·관계'}; doc['groups'].append(group)
-        group.update(weight=data.group_weight if any(c['importance']>0 for c in members) else 0.0,source='user',reason='사용자가 여가 조건과 중요도를 직접 확인했어.')
+        if edited(data,'group_weight') or 'weight' not in group or not any(c['importance']>0 for c in members):
+            group.update(weight=data.group_weight if any(c['importance']>0 for c in members) else 0.0,source='user',reason='사용자가 여가 중요도를 확인했어.')
     return NeedProfile.model_validate(doc)

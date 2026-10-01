@@ -6,8 +6,10 @@ function currentStop() {
 function updateTransportControls() {
   $('transport-fields').disabled = state.busy;
   $('stop-fields').disabled = state.busy || !$('include-stop').checked;
+  $('stop-hard-limit').disabled = state.busy || !$('include-stop').checked || !$('stop-mandatory').checked;
 }
 function renderTransportProfile() {
+  resetEdits('transport-form');
   state.transportDirty = false;
   const p = state.profile, stop = currentStop();
   const context = key => p.context.find(c => c.key === key)?.value || '';
@@ -20,11 +22,14 @@ function renderTransportProfile() {
   $('stop-ideal').value = stop?.utility?.ideal ?? 300;
   $('stop-limit').value = stop?.utility?.limit ?? 1000;
   $('transport-weight').value = p.groups.find(g => g.id === (stop?.group_id || 'transport'))?.weight ?? 30;
-  $('stop-importance').value = stop?.importance || 100;
+  $('stop-importance').value = stop?.importance ?? 100;
   $('stop-mandatory').checked = !!stop?.hard;
+  $('stop-hard-limit').value = stop?.hard?.value ?? stop?.utility?.limit ?? 1000;
   updateTransportControls();
 }
 $('include-stop').addEventListener('change', updateTransportControls);
+$('stop-mandatory').addEventListener('change', updateTransportControls);
+watchEdits('transport-form',{'travel-mode':'mode','travel-destination':'destination','travel-time':'time_of_day','include-stop':'include_stop','stop-ideal':'ideal','stop-limit':'limit','transport-weight':'group_weight','stop-importance':'importance','stop-mandatory':'mandatory_limit','stop-hard-limit':'hard_limit'});
 $('transport-form').addEventListener('input', () => {
   state.transportDirty = true;
   notice('교통 조건을 수정했어. 교통 조건 적용을 누르면 비교에 반영돼.');
@@ -59,6 +64,8 @@ $('transport-form').addEventListener('submit', async event => {
       ideal:Number($('stop-ideal').value), limit:Number($('stop-limit').value),
       group_weight:Number($('transport-weight').value), importance:Number($('stop-importance').value),
       mandatory_limit:$('stop-mandatory').checked,
+      hard_limit:$('stop-mandatory').checked?Number($('stop-hard-limit').value):null,
+      edited_fields:editedFields('transport-form'),
     });
     setProfile(result.profile);
     notice('교통 조건을 반영했어. 같은 후보로 다시 비교하면 새 조건을 적용해.');

@@ -86,11 +86,22 @@ export function applyVillagePreferences(profile,draft){
  const missing=draft.blocks.filter(b=>b.id!=='housing'&&(!profile.groups.some(g=>g.id===b.id)||!profile.criteria.some(c=>c.group_id===b.id&&c.importance>0))).map(b=>b.id);
  if(missing.length)return {profile:null,missing,referenceOnly:false};
  const copy=structuredClone(profile);
- copy.groups=copy.groups.filter(g=>selected.has(g.id));
- copy.criteria=copy.criteria.filter(c=>selected.has(c.group_id));
- const criterionIds=new Set(copy.criteria.map(c=>c.id));
- copy.questions=copy.questions.filter(q=>!q.criterion_ids.length||q.criterion_ids.some(id=>criterionIds.has(id))).map(q=>({...q,criterion_ids:q.criterion_ids.filter(id=>criterionIds.has(id))}));
- for(const g of copy.groups){g.weight=g.id==='housing'?0:selected.has(g.id)?rawWeight(selected.get(g.id)):0;g.source='user';g.reason=g.id==='housing'?'집·비용은 실거래 참고만':'블록 마을에서 선택한 중요도';}
- if(!copy.groups.some(g=>g.weight>0))return {profile:copy,missing:[],referenceOnly:true};
- return {profile:copy,missing:[],referenceOnly:false};
+ const additionalGroups=copy.groups.filter(g=>!selected.has(g.id)&&copy.criteria.some(c=>c.group_id===g.id&&(c.importance>0||c.hard))).map(g=>g.id);
+ for(const g of copy.groups){if(!selected.has(g.id))continue;g.weight=g.id==='housing'?0:rawWeight(selected.get(g.id));g.source='user';g.reason=g.id==='housing'?'집·비용은 실거래 참고만':'블록 마을에서 선택한 중요도';}
+ return {profile:copy,missing:[],additionalGroups,referenceOnly:!copy.groups.some(g=>g.weight>0)&&!copy.criteria.some(c=>c.hard)};
+}
+
+export function confirmAdditionalGroups(profile,offered,included){
+ if(included.some(id=>!offered.includes(id))||offered.some(id=>!profile.groups.some(g=>g.id===id)))throw new TypeError('unknown additional group');
+ const copy=structuredClone(profile),excluded=new Set(offered.filter(id=>!included.includes(id)));
+ const excludedCriteria=new Set(copy.criteria.filter(c=>excluded.has(c.group_id)).map(c=>c.id));
+ copy.groups=copy.groups.filter(g=>!excluded.has(g.id));
+ copy.criteria=copy.criteria.filter(c=>!excludedCriteria.has(c.id));
+ copy.questions=copy.questions.filter(q=>!q.criterion_ids.length||q.criterion_ids.some(id=>!excludedCriteria.has(id))).map(q=>({...q,criterion_ids:q.criterion_ids.filter(id=>!excludedCriteria.has(id))}));
+ for(const g of copy.groups.filter(g=>included.includes(g.id))){g.source='user';g.reason='사용자가 추가 요구와 제안 비중을 확인했어.';}
+ const names=profile.groups.filter(g=>offered.includes(g.id)).map(g=>`${g.label}: ${excluded.has(g.id)?'이번 분석에서 제외':'추가 요구와 표시한 비중 포함'}`).join(', ');
+ const request=copy.request+'\n추가 조건 확인: '+names+'.';
+ if(request.length>4000)throw new TypeError('조건 기록이 길어졌어. 원래 내용을 유지했으니 조건 수정에서 정리해 줘.');
+ copy.request=request;copy.revision++;
+ return copy;
 }

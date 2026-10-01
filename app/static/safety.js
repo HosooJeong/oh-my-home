@@ -14,6 +14,7 @@ function updateSafetyControls() {
   $('safety-cancel').hidden = !reviewState.job || !(state.run?.safety_research_scope || []).length;
 }
 function renderSafetyProfile() {
+  resetEdits('safety-form');
   state.safetyDirty = false;
   const p = state.profile;
   const context = key => p.context.find(c=>c.key===key)?.value;
@@ -68,11 +69,12 @@ function renderSafety() {
   if (searched.size) $('safety-research-result').append(node('p','조사 범위: '+state.run.safety_research_scope.map(t=>t.area_name).join(', ')+'. 진주시청 공개 게시글, 최대 3개 지역.'+(remaining.length?' 이번에 조사하지 않은 지역: '+remaining.join(', '):''),'hint'));
   updateSafetyControls();
 }
+watchEdits('safety-form',{'safety-topic':'topics','safety-weight':'group_weight','safety-importance':'criterion_importance','safety-radius':'radius_m','safety-research':'qualitative_research'});
 $('safety-form').addEventListener('input',()=>{state.safetyDirty=true;updateCompare();notice('안전·환경 조건을 수정했어. 조건 적용을 누르면 반영돼.');});
 $('safety-form').addEventListener('submit',async event=>{
   event.preventDefault(); if(state.busy)return;busy(true);
   try {
-    const result=await api('/api/safety-profile',{profile:state.profile?withRules(withWeights(state.profile)):null,
+    const result=await api('/api/safety-profile',{profile:state.profile?withRules(withWeights(state.profile,false)):null,edited_fields:editedFields('safety-form'),
       topics:[...document.querySelectorAll('[name="safety-topic"]:checked')].map(i=>i.value),
       group_weight:Number($('safety-weight').value),criterion_importance:Number($('safety-importance').value),
       radius_m:Number($('safety-radius').value),qualitative_research:$('safety-research').checked});

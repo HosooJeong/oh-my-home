@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {CATEGORIES,RADII,emptyDraft,toggleCategory,moveBlock,setLevel,shares,evaluationShares,levelForPosition,readDraft,buildRequest,applyVillagePreferences} from '../app/static/village-model.mjs';
+import {CATEGORIES,RADII,emptyDraft,toggleCategory,moveBlock,setLevel,shares,evaluationShares,levelForPosition,readDraft,buildRequest,applyVillagePreferences,confirmAdditionalGroups} from '../app/static/village-model.mjs';
 
 test('five distance levels are invariant under horizontal rotation',()=>{
  for(let i=0;i<RADII.length;i++)for(const angle of [0,.42,1.7,3.5])assert.equal(levelForPosition(Math.cos(angle)*RADII[i],Math.sin(angle)*RADII[i]),i+1);
@@ -35,10 +35,19 @@ test('handoff stays below the intake limit and includes only selected answers',(
  const d=emptyDraft();d.entry='discover';d.location='가'.repeat(200);for(const c of CATEGORIES){toggleCategory(d,c.id);d.answers[c.id]='나'.repeat(450);}
  assert.ok(buildRequest(d).length<4000);toggleCategory(d,'education');assert.ok(!buildRequest(d).includes('교육·육아:'));assert.ok(buildRequest(d).includes('가격 점수/실제 매물 추천은 제외'));
 });
-test('handoff preserves chosen weights, removes unrelated conditions and keeps price reference-only',()=>{
+test('handoff preserves additional needs and chosen weights, with price reference-only',()=>{
  const d=emptyDraft();for(const id of ['living','transport','housing'])toggleCategory(d,id);setLevel(d,'living',1);setLevel(d,'transport',5);
  const p={groups:CATEGORIES.map(c=>({id:c.id,weight:50,source:'proposed'})),criteria:CATEGORIES.map(c=>({id:c.id+'-criterion',group_id:c.id,importance:100})),questions:[{id:'e',criterion_ids:['education-criterion']},{id:'t',criterion_ids:['transport-criterion']}]};
- const result=applyVillagePreferences(p,d);assert.equal(result.profile.groups.find(g=>g.id==='living').weight,100);assert.equal(result.profile.groups.find(g=>g.id==='transport').weight,20);assert.equal(result.profile.groups.find(g=>g.id==='housing').weight,0);assert.equal(result.profile.groups.length,3);assert.equal(result.profile.questions.length,1);assert.equal(p.groups[0].weight,50);
+ const result=applyVillagePreferences(p,d);assert.equal(result.profile.groups.find(g=>g.id==='living').weight,100);assert.equal(result.profile.groups.find(g=>g.id==='transport').weight,20);assert.equal(result.profile.groups.find(g=>g.id==='housing').weight,0);assert.equal(result.profile.groups.length,6);assert.deepEqual(result.profile.questions,p.questions);assert.deepEqual(result.additionalGroups,['education','safety','leisure']);assert.equal(p.groups[0].weight,50);
+});
+
+test('an extension hard need and its question survive until explicit exclusion',()=>{
+ const d=emptyDraft();toggleCategory(d,'education');
+ const p={revision:1,request:'학교가 가까워야 하고 엘리베이터는 필수야.',context:[],groups:[{id:'education',weight:100,label:'교육'},{id:'accessibility',weight:25,label:'접근성'}],criteria:[{id:'school',group_id:'education',importance:100},{id:'lift',group_id:'accessibility',importance:0,hard:{operator:'eq',value:1}}],questions:[{id:'lift_check',criterion_ids:['lift'],blocking:true},{id:'both',criterion_ids:['lift','school'],blocking:false}]};
+ const bridged=applyVillagePreferences(p,d);assert.deepEqual(bridged.profile.criteria,p.criteria);assert.deepEqual(bridged.profile.questions,p.questions);
+ const kept=confirmAdditionalGroups(bridged.profile,bridged.additionalGroups,['accessibility']);assert.deepEqual(kept.criteria,p.criteria);assert.equal(kept.groups[1].source,'user');
+ const excluded=confirmAdditionalGroups(bridged.profile,bridged.additionalGroups,[]);assert.deepEqual(excluded.criteria.map(c=>c.id),['school']);assert.deepEqual(excluded.questions.map(q=>q.criterion_ids),[['school']]);assert.ok(excluded.request.includes('제외'));assert.deepEqual(p.criteria[1].hard,{operator:'eq',value:1});
+ assert.throws(()=>confirmAdditionalGroups(p,['accessibility'],['other']));
 });
 test('missing selected categories and reference-only profiles are explicit',()=>{
  const d=emptyDraft();toggleCategory(d,'living');assert.deepEqual(applyVillagePreferences({groups:[],criteria:[],questions:[]},d).missing,['living']);

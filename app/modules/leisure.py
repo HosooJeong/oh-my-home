@@ -102,11 +102,19 @@ class LeisureIndex:
         if not candidates: return None
         active = [c for c in profile.criteria if c.module_id=='leisure' and c.metric==HOBBY_METRIC and (c.importance>0 or c.hard)]
         if not active: return None
-        activities = list(dict.fromkeys(c.parameters.get('activity') for c in active if c.parameters.get('activity') in ACTIVITIES))[:3]
-        if not activities: return None
-        activity_names={a:(next((c.parameters.get('activity_name') for c in active if c.parameters.get('activity')==a),None) or ACTIVITIES[a]) for a in activities}
-        activities=[a for a in activities if a!='other' or activity_names[a]!=ACTIVITIES[a]]
-        if not activities: return None
+        requests = []
+        for c in active:
+            activity=c.parameters.get('activity')
+            name=c.parameters.get('activity_name') if activity=='other' else ACTIVITIES.get(activity)
+            if activity in ACTIVITIES and name:
+                requests.append({'criterion_id':c.id,'activity':activity,'activity_name':name,
+                                 'forms':[c.parameters['activity_form']] if c.parameters.get('activity_form') else []})
+        selected_requests=requests[:3]
+        if not selected_requests: return None
+        activities=list(dict.fromkeys(r['activity'] for r in selected_requests))
+        # Compatibility dictionaries exist only for an unambiguous request. Never merge forms.
+        single={a:next(r for r in selected_requests if r['activity']==a) for a in activities
+                if sum(r['activity']==a for r in selected_requests)==1}
         areas = []
         if self.boundary:
             for candidate in candidates:
@@ -114,15 +122,20 @@ class LeisureIndex:
                 if code and self.boundary.features[code]['properties']['name'] not in areas:
                     areas.append(self.boundary.features[code]['properties']['name'])
         selected = []
-        for activity in activities:
-            rows = [r for r in self.hobby_rows(activity,activity_names[activity]) if fresh(r)]
-            rows.sort(key=lambda r:(activity_names[activity] not in r['name'],
+        for request in selected_requests:
+            activity,name=request['activity'],request['activity_name']
+            rows = [r for r in self.hobby_rows(activity,name) if fresh(r)]
+            rows.sort(key=lambda r:(name not in r['name'],
                 min(distance_m(c.latitude,c.longitude,r['lat'],r['lon']) for c in candidates),r['id']))
             selected.extend({'id':r['id'],'name':r['name'],'address':r['address'],'activity':activity,
-                'registered_detail':r['detail'],'data_date':r['date']} for r in rows[:2])
-        return {'city':'진주시','areas':areas[:3], 'activities':activities,'activity_names':activity_names,
-                'forms':{a:list(dict.fromkeys(c.parameters.get('activity_form','') for c in active if c.parameters.get('activity')==a)) for a in activities},
-                'registered_leads':selected[:6], 'unsearched_activity_count':max(0,len({(c.parameters.get('activity'),c.parameters.get('activity_name')) for c in active})-len(activities))}
+                'criterion_id':request['criterion_id'],'registered_detail':r['detail'],'data_date':r['date']} for r in rows[:2])
+        chosen={r['criterion_id'] for r in selected_requests}
+        unsearched=[{'criterion_id':c.id,'activity_name':c.parameters.get('activity_name') or ACTIVITIES.get(c.parameters.get('activity'),c.label)} for c in active if c.id not in chosen]
+        return {'city':'진주시','areas':areas[:3], 'activities':activities,
+                'activity_names':{a:r['activity_name'] for a,r in single.items()},
+                'forms':{a:r['forms'] for a,r in single.items()},'requests':selected_requests,
+                'registered_leads':selected[:6], 'unsearched_activity_count':len(unsearched),'unsearched_requests':unsearched}
+
 
 
 class LeisureModule:

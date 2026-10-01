@@ -17,6 +17,7 @@ from .contracts import Candidate, Contract, InterviewTurn, NeedProfile, Weight, 
 from .candidates import CandidatePool, GenerationInput
 from .intake import prepare_profile
 from .reviews import ReviewInput, map_links, research_reviews
+from .preference_edits import PreservationError, edited, edit_quote, preserve_need
 from .modules.living import LivingModule, ShopIndex
 from .modules.transport import StopIndex, TransportModule
 from .modules.housing import HousingIndex, HousingModule, HousingQuery
@@ -63,6 +64,8 @@ class SupplementInput(Contract):
 
 
 class QuickInput(Contract):
+    profile: NeedProfile | None = None
+    edited_fields: Annotated[list[str], Field(max_length=10)] | None = None
     ideal: Annotated[float, Field(ge=0, le=20000, allow_inf_nan=False)]
     limit: Annotated[float, Field(gt=0, le=50000, allow_inf_nan=False)]
     supermarket_weight: Weight
@@ -71,13 +74,14 @@ class QuickInput(Contract):
 
 
 def quick_profile(data: QuickInput):
+    if data.profile and data.edited_fields == []: return data.profile.model_copy(deep=True)
     if data.ideal >= data.limit or data.supermarket_weight + data.convenience_weight == 0:
         raise ValueError("invalid quick preferences")
     request = (f"마트와 편의점의 직선거리를 비교해 줘. {data.ideal:g}m 이내가 이상적이고 "
                f"{data.limit:g}m 이상은 만족도가 0이야. 마트 중요도 {data.supermarket_weight:g}, "
                f"편의점 중요도 {data.convenience_weight:g}. "
                + (f"두 시설 모두 반드시 {data.limit:g}m 이내여야 해." if data.mandatory_limit else "필수 제한은 없어."))
-    return NeedProfile.model_validate({"schema_version": "1", "revision": 1, "request": request,
+    fresh = {"schema_version": "1", "revision": 1, "request": request,
         "context": [], "groups": [{"id": "living", "label": "생활·건강", "weight": 100.0,
                                     "source": "user", "reason": "직접 선택한 장보기 조건"}],
         "criteria": [{"id": id, "group_id": "living", "module_id": "living", "label": label,
@@ -88,7 +92,32 @@ def quick_profile(data: QuickInput):
             for id, label, metric, weight in [
                 ("grocery", "마트", "grocery_straight_line_distance_m", data.supermarket_weight),
                 ("convenience", "편의점", "convenience_straight_line_distance_m", data.convenience_weight)]],
-        "questions": []})
+        "questions": []}
+    if data.profile is None: return NeedProfile.model_validate(fresh)
+    doc=data.profile.model_dump();doc['revision']+=1
+    quote=edit_quote(data,request);doc['request']+='\n'+quote
+    for template, field in zip(fresh['criteria'],('supermarket_weight','convenience_weight')):
+        metrics={template['metric']}
+        if field=='supermarket_weight': metrics.add('house_to_grocery_straight_line_distance_m')
+        old=[c for c in doc['criteria'] if c['module_id']=='living' and c['metric'] in metrics]
+        if len(old)>1 or old and old[0]['group_id']!='living':
+            raise PreservationError('여러 장보기 조건이 있어. 이 입력란으로 합치지 않고 원래 조건을 유지했어.')
+        if not old:
+            while any(c['id']==template['id'] for c in doc['criteria']): template['id']+='_x'
+            template['source_quote']=quote;doc['criteria'].append(template);continue
+        c=old[0];values={}
+        if edited(data,'ideal','limit'):
+            if c['utility'] and (c['utility']['unit']!='m' or c['utility']['direction']!='lower'):
+                raise PreservationError('기존 장보기 기준은 직선거리와 달라. 원래 조건을 유지했어.')
+            values['utility']=template['utility']
+        if edited(data,field): values.update(importance=template['importance'],importance_source='user')
+        if edited(data,'mandatory_limit'):
+            if c['hard'] and c['hard']['operator']!='lte' and data.mandatory_limit:
+                raise PreservationError('기존 장보기 필수조건은 이 입력란으로 표현할 수 없어. 원래 조건을 유지했어.')
+            values['hard']=(c['hard'] or template['hard']) if data.mandatory_limit else None
+        preserve_need(c,values,quote)
+    if not any(g['id']=='living' for g in doc['groups']):doc['groups'].append(fresh['groups'][0])
+    return NeedProfile.model_validate(doc)
 
 
 class AppState:
@@ -463,6 +492,8 @@ def make_handler(state, env_path):
                 return self.send(404, {"error": "not_found"})
             except PermissionError:
                 self.send(403, {"error": "session_or_origin"})
+            except PreservationError as error:
+                self.send(422, {'error': str(error)})
             except (ValueError, TypeError):
                 self.send(400, {"error": "invalid_or_stale_input"})
             except RuntimeError:

@@ -8,6 +8,7 @@ function initLeisure(data){
   $('leisure-data-note').textContent=`등록 공원 ${data.counts.park}곳 · 도서관 ${data.counts.library}곳. 1년이 지났거나 미래인 공원 ${data.stale_or_future.park}곳 · 도서관 ${data.stale_or_future.library}곳. 오래된 자료가 있으면 최단거리 점수를 유보해. 사설 시설은 상가 목록과 웹검색으로 보완해.`;
 }
 function renderLeisureProfile(){
+  resetEdits('leisure-form');
   state.leisureDirty=false;
   const p=state.profile;
   const find=m=>p.criteria.find(c=>c.module_id==='leisure'&&c.metric===m);
@@ -70,6 +71,7 @@ function renderLeisure(){
   else $('leisure-status').textContent=state.run.leisure_research_scope?'요청한 종목의 사설 시설 후보와 이용 형태를 웹으로 조사해.':'사설 취미를 선택하면 후보 발굴과 웹 보완이 이어져. 이용 조건이 미확인이면 전체 순위는 보류해.';
   updateLeisureControls();
 }
+watchEdits('leisure-form',{'include-park':'include_park','park-type':'park_type','include-library':'include_library','library-type':'library_type','leisure-ideal':'ideal','leisure-limit':'limit','park-importance':'park_importance','library-importance':'library_importance','include-meeting':'include_meeting','meeting-label':'meeting_label','meeting-lat':'meeting_latitude','meeting-lon':'meeting_longitude','meeting-importance':'meeting_importance','include-hobby':'include_hobby','hobby-activity':'activity','hobby-name':'activity_name','hobby-form':'activity_form','hobby-importance':'hobby_importance','leisure-weight':'group_weight'});
 $('leisure-form').addEventListener('input',()=>{state.leisureDirty=true;updateCompare();notice('여가 조건을 수정했어. 조건 적용을 누르면 반영돼.');});
 $('leisure-form').addEventListener('submit',async event=>{
   event.preventDefault();if(state.busy)return;
@@ -77,7 +79,7 @@ $('leisure-form').addEventListener('submit',async event=>{
   try{if(state.profile)profile=withRules(withWeights(state.profile,false));}catch(error){return notice(error.message,true);}
   busy(true);
   try{
-    const result=await api('/api/leisure-profile',{profile,include_park:$('include-park').checked,park_type:$('park-type').value,
+    const result=await api('/api/leisure-profile',{profile,edited_fields:editedFields('leisure-form'),include_park:$('include-park').checked,park_type:$('park-type').value,
       include_library:$('include-library').checked,library_type:$('library-type').value,ideal:Number($('leisure-ideal').value),limit:Number($('leisure-limit').value),
       park_importance:Number($('park-importance').value),library_importance:Number($('library-importance').value),
       include_meeting:$('include-meeting').checked,meeting_label:$('meeting-label').value.trim(),

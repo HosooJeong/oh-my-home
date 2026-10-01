@@ -59,6 +59,7 @@
           <label class="check"><input id="include-library" type="checkbox">도서관 접근성</label>
           <label>도서관 유형<select id="library-type"><option value="any">공공·작은도서관</option><option value="public">공공도서관</option><option value="small">작은도서관</option></select></label>
           <div class="pair"><label>이상적 직선거리 (m)<input id="leisure-ideal" type="number" min="0" max="20000" step="any" value="500" required></label><label>만족도 0 거리 (m)<input id="leisure-limit" type="number" min="1" max="50000" step="any" value="1500" required></label></div>
+          <p class="hint">거리 입력을 바꾸면 선택한 공원·도서관·만남 지점에 함께 적용돼.</p>
           <div class="pair"><label>공원 중요도<input id="park-importance" type="number" min="0" max="100" value="40" required></label><label>도서관 중요도<input id="library-importance" type="number" min="0" max="100" value="20" required></label></div>
           <label class="check"><input id="include-meeting" type="checkbox">지정 만남 지점까지 거리</label>
           <label>만남 지점 이름<input id="meeting-label" maxlength="100" placeholder="예: 가족과 만나는 장소"></label>
@@ -85,7 +86,8 @@
               <div class="pair"><label>이상적 직선거리 (m)<input id="stop-ideal" type="number" min="0" max="20000" step="any" value="300" required></label><label>만족도 0 거리 (m)<input id="stop-limit" type="number" min="1" max="50000" step="any" value="1000" required></label></div>
               <div class="pair"><label>교통 분야 중요도<input id="transport-weight" type="number" min="0" max="100" value="30" required></label><label>정류장 조건 중요도<input id="stop-importance" type="number" min="0" max="100" value="100" required></label></div>
               <p class="hint">300m·1,000m는 편집용 초기값이야. 적용할 때 네 기준으로 확인해 줘. 중요도는 다른 분야·조건과의 상대적 비중이야.</p>
-              <label class="check"><input id="stop-mandatory" type="checkbox">정류장은 위 최대 거리 이내여야 해</label>
+              <label class="check"><input id="stop-mandatory" type="checkbox">정류장 거리에 필수 제한 적용</label>
+              <label>필수 최대 직선거리 (m)<input id="stop-hard-limit" type="number" min="1" max="50000" step="any" value="1000" required></label>
             </fieldset>
             <button id="apply-transport" type="submit">교통 조건 적용</button>
           </fieldset></form>

@@ -14,12 +14,13 @@ function initEducation(data) {
     : '교육 자료가 준비되지 않았어. 조건은 보존하고 결과는 미확인으로 남겨.';
 }
 function renderEducationProfile() {
+  resetEdits('education-form');
   state.educationDirty = false;
   const p = state.profile;
   const school = p.criteria.find(c => c.module_id === 'education' && c.metric === 'school_straight_line_distance_m');
   const academy = p.criteria.find(c => c.module_id === 'education' && c.metric === 'academy_count_within_radius');
-  $('include-school').checked = !!school && school.importance > 0;
-  $('include-academy').checked = !!academy && academy.importance > 0;
+  $('include-school').checked = !!school && (school.importance > 0 || !!school.hard);
+  $('include-academy').checked = !!academy && (academy.importance > 0 || !!academy.hard);
   $('school-level').value = school?.parameters.school_level || academy?.parameters.school_level || 'elementary';
   $('school-ideal').value = school?.utility?.ideal ?? 500;
   $('school-limit').value = school?.utility?.limit ?? 1500;
@@ -33,6 +34,7 @@ function renderEducationProfile() {
   $('school-travel').value = ['alone','accompanied','car','shuttle'].includes(travel) ? travel : 'unknown';
   $('education-research').checked = p.context.some(c => c.key === 'education_research' && c.value === 'requested');
 }
+watchEdits('education-form',{'school-level':'school_level','school-travel':'travel_mode','include-school':'include_school','school-ideal':'school_ideal','school-limit':'school_limit','school-importance':'school_importance','include-academy':'include_academy','academy-subject':'subject','academy-radius':'radius_m','academy-sufficient':'sufficient_count','academy-importance':'academy_importance','education-weight':'group_weight','education-research':'qualitative_research'});
 $('education-form').addEventListener('input', () => {state.educationDirty = true; updateCompare(); notice('교육 조건을 수정했어. 교육 조건 적용을 누르면 반영돼.');});
 $('education-form').addEventListener('submit', async event => {
   event.preventDefault(); if (state.busy) return;
@@ -41,7 +43,7 @@ $('education-form').addEventListener('submit', async event => {
   catch(error) { return notice(error.message, true); }
   busy(true);
   try {
-    const result = await api('/api/education-profile', {profile,
+    const result = await api('/api/education-profile', {profile,edited_fields:editedFields('education-form'),
       school_level:$('school-level').value, travel_mode:$('school-travel').value,
       include_school:$('include-school').checked, school_ideal:Number($('school-ideal').value), school_limit:Number($('school-limit').value),
       school_importance:Number($('school-importance').value), include_academy:$('include-academy').checked,
