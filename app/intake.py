@@ -7,6 +7,7 @@ from pydantic import Field, ValidationError
 from .contracts import (Contract, Identifier, InterviewTurn, NeedProfile,
                         Question, UtilityRule, HardRule, Weight)
 from typing import Literal
+from .need_coverage import IntakeNeed, required_sources, review_needs
 
 
 class IntakeParameter(Contract):
@@ -49,6 +50,7 @@ class IntakeDraft(Contract):
     criteria: Annotated[list[IntakeCriterion], Field(max_length=50)]
     context: Annotated[list[IntakeContext], Field(max_length=30)]
     questions: Annotated[list[Question], Field(max_length=3)]
+    needs: Annotated[list[IntakeNeed], Field(max_length=80)] = []
 
 
 GROUP_LABELS = {'living':'생활·건강', 'transport':'교통·동선', 'education':'교육·육아',
@@ -201,11 +203,12 @@ def prepare_profile(runner: CodexRunner, request: str, answers: list[InterviewTu
             raise ValueError("keep the original request for an interview continuation")
     revision = previous.revision + 1 if previous else 1
     sources = source_segments([request] + [a.answer for a in answers])
+    required_ids=required_sources(sources)
     if previous:
         for c in [*previous.criteria, *previous.context]:
             if c.source_quote not in sources.values():
                 sources['s' + str(len(sources) + 1)] = c.source_quote
-    data = {'sources':sources, 'previous':previous.model_dump() if previous else None,
+    data = {'sources':sources, 'required_source_ids':required_ids, 'previous':previous.model_dump() if previous else None,
             'answers':[a.model_dump() for a in answers]}
     compact_rules = '''\n출력은 IntakeDraft다. request/revision/schema_version/module_id/source_quote를 출력하지 마라.
 source_quote 규칙 대신 source_id에 근거가 있는 입력 sources의 키(s1 등)를 넣어라.
@@ -213,11 +216,30 @@ parameters는 해당하는 key/value 항목만 담는 목록이며 해당 없는
 parameters에는 스키마의 허용 key만 쓰고 보조 설명·도보 시간은 need/context에 보존하라.
 label/need는 간결히 쓰고 원문을 반복하지 마라. 집·비용 참고만 요청하면 housing 그룹 weight=0,
 criteria는 추가하지 않고 context housing_reference=requested를 남겨라.
-다른 분야의 니즈는 보존하라. 이전 criteria의 id는 유지하라. 원문/정체성과 검증은 앱이 붙인다.'''
+다른 분야의 니즈는 보존하라. 이전 criteria의 id는 유지하라. 원문/정체성과 검증은 앱이 붙인다.
+needs는 원문 요구별 처리표다. required_source_ids의 모든 원문에 대해 하나 이상의 항목을 반환하라.
+한 원문에 다른 요구가 있으면 항목을 분리하라. source_id는 원문, group_id는 해당 분야(배경은 null)다.
+aspect는 straight_distance(명시 직선거리), facility_count(등록 개소), facility_fit(규모/품목/이용형태),
+walking_route(실제 도보), travel_time(목적지 이동시간), transfer(환승), school_assignment(배정),
+environment(안전/환경), housing(주택/비용), other(그 외)다.
+handling=compare는 비교 요구, research는 보완 조사 요청, reference는 참고 조회,
+background는 비교 요구 아닌 배경 사실, excluded는 사용자 명시 제외, clarify는 처리 방법 확인이 필요함이다.
+compare/clarify는 criterion_ids로 연결하고, 배경/참고/조사는 context_keys에 연결하라.
+reference/research 자체를 점수 조건으로 만들지 마라. research는 실제 *_research=requested context와 연결하라.
+거리 지표는 straight_distance만, 학원 개소는 facility_count만 다룬다. 큰 마트/대량 장보기·품목·
+수업/취미 형태·통근시간·환승·학교 배정·안전은 이 지표로 충족되지 않으므로 별도 미지원 criteria로 남겨라.
+비교할 니즈를 context로만 내려 보내거나 이미 지원하는 지표의 need에 숨기지 마라.
+제외는 해당 criterion을 importance=0/hard=null로 남기고 명시 제외 원문을 resolution_source_id에 연결하라.
+인터뷰로 기존 요구를 구체화했다면 resolution_source_id는 답변 원문이다. 없으면 null이다.
+사용자가 실제로 요구한 수치/필수 제약을 모두 보존하고 기준이 없으면 미확인 또는 짧은 질문으로 남겨라.
+명시 필수인 미지원 조건은 원문 조건 충족 여부를 boolean ideal=1/limit=0/unit=bool, hard eq=1로 보존할 수 있다.
+이는 원문 제약의 충족 여부이며 임의 이동시간·품질 만족도 곡선을 만들라는 뜻이 아니다.
+needs에 연결하는 조건/맥락은 그 원문의 내용이어야 한다. 원문 id가 맞다는 이유로 다른 요구를 연결하지 마라.'''
     profile = runner.run(INSTRUCTIONS + compact_rules + "\n입력(JSON):\n" + json.dumps(data, ensure_ascii=False),
                          IntakeDraft, search=False, **runner_options)
+    need_records=profile.needs if isinstance(profile,IntakeDraft) else None
     if isinstance(profile, IntakeDraft):
-        runner.last_metadata['intake_format'] = 'compact_sources_v1'
+        runner.last_metadata['intake_format'] = 'compact_sources_v2'
         try:
             profile = expand_draft(profile, request, revision, sources)
         except RunnerError as error:
@@ -245,4 +267,6 @@ criteria는 추가하지 않고 context housing_reference=requested를 남겨라
                 explicit=[float(v) for text in source_texts for v in re.findall(label+r'\s*[:=]?\s*([-+]?\d+(?:\.\d+)?)',text)]
             except (KeyError,ValueError,TypeError): raise RunnerError('unsupported_meeting_coordinates')
             if value not in explicit: raise RunnerError('unsupported_meeting_coordinates')
+    profile,review=review_needs(profile,sources,need_records,required_ids,previous,answers)
+    if hasattr(runner,'last_metadata'):runner.last_metadata['need_review']=review
     return profile

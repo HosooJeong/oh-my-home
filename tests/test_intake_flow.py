@@ -22,7 +22,8 @@ class IntakeFlowTests(unittest.TestCase):
     def draft(self, **changes):
         return IntakeDraft.model_validate(dict(groups=[dict(id='housing',weight=0.0,source='user')],
             criteria=[],context=[dict(key='housing_reference',value='requested',source_id='s1')],
-            questions=[],**changes))
+            questions=[],needs=[dict(source_id='s1',group_id='housing',aspect='housing',handling='reference',
+                criterion_ids=[],context_keys=['housing_reference'],resolution_source_id=None)],**changes))
 
     def test_reference_only_contract_does_not_invent_price_score(self):
         p=expand_draft(self.draft(), '실거래 참고만', 1, {'s1':'실거래 참고만'})
@@ -53,6 +54,7 @@ class IntakeFlowTests(unittest.TestCase):
                 return self.draft()
         p=prepare_profile(Fake(),'실거래 참고만')
         self.assertEqual((p.request,p.revision),('실거래 참고만',1))
+        self.assertEqual(p.questions,[])
 
     def test_exploration_retains_unknown_weight_and_withholds_full_rank(self):
         p=profile(100,0)
