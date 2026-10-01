@@ -35,6 +35,45 @@ class GenerationInput(Contract):
     mode: Literal['strict', 'exploratory'] = 'strict'
 
 
+def selection_reason(profile, assessment, evidence, tied):
+    """Describe measured selection inputs, never infer the unmeasured needs."""
+    criteria = {c.id:c for c in profile.criteria}
+    basis, unknown = [], []
+    for detail in assessment['details']:
+        if detail['status'] == 'not_requested':
+            continue
+        criterion = criteria[detail['criterion_id']]
+        if detail['status'] != 'known':
+            unknown.append({'criterion_id':criterion.id, 'label':criterion.label,
+                            'need':criterion.need, 'weight':detail['weight'],
+                            'hard_status':detail['hard_status']})
+            continue
+        fact = evidence[detail['evidence_id']]
+        basis.append({'criterion_id':criterion.id, 'label':criterion.label,
+                      'metric':criterion.metric, 'value':fact['value'], 'unit':fact['unit'],
+                      'weight':detail['weight'], 'contribution':detail['contribution'],
+                      'hard_status':detail['hard_status'], 'evidence_id':fact['id'],
+                      'source_url':fact['source_url'], 'data_date':fact['data_date']})
+    basis.sort(key=lambda b:(-b['contribution'], -b['weight'], b['criterion_id']))
+    def measured_label(b):
+        value = f"{round(b['value']):,}m·직선거리" if b['unit']=='m' else f"{b['value']:g}개소·등록자료" if b['unit']=='count' else f"{b['value']:g} {b['unit']}"
+        return f"{b['label']}({value})"
+    labels = ' · '.join(measured_label(b) for b in basis[:2])
+    text = f'{labels}의 확인된 기여를 기준으로 골랐어.'
+    if assessment['score_range'][0] == 0:
+        text = f'{labels}을 확인했지만 네 기준에 따른 기여는 0점이야.'
+    if unknown:
+        text += ' ' + ' · '.join(c['label'] for c in unknown[:2]) + (' 등은' if len(unknown)>2 else '은') + ' 미확인이야.'
+    if tied:
+        text += ' 같은 평가값의 지점은 ID 순서와 후보 간격으로 골랐어.'
+    return {'text':text, 'basis':basis, 'unverified':unknown,
+            'tie_breaker':'candidate_id_then_separation' if tied else None}
+
+
+def has_selection_evidence(assessment):
+    return any(d['status']=='known' and d['weight']>0 for d in assessment['details'])
+
+
 class CandidatePool:
     def __init__(self, document, boundary):
         self.document, self.boundary = document, boundary
@@ -71,8 +110,10 @@ class CandidatePool:
         return {**self.boundary.metadata(), "available": True, "point_count": len(self.points),
                 "cell_size_m": 500, "version": self.document["version"],
                 "inventory_generated_at": self.document["inventory_generated_at"],
-                "areas": [{**a, "point_count": counts[a["code"]]} for a in self.boundary.metadata()["areas"]],
-                "limitations": "상가가 등록된 500m 격자의 중심점만 비교해. 실제 주택·매물·도로·거주 가능 여부는 미확인이야."}
+                "areas": [{**a, "point_count": counts[a["code"]],
+                           "view_bounds":list(self.boundary.bounds[a['code']])}
+                          for a in self.boundary.metadata()["areas"]],
+                "limitations": "상가가 등록된 500m 격자 중심점만 비교해. 조용한 주거지·자연환경을 고르게 대표하지 않으며 실제 주택·매물·거주 가능 여부는 미확인이야."}
 
     def generate(self, data, orchestrator):
         valid_codes = set(self.boundary.features) - {"38030"}
@@ -102,10 +143,29 @@ class CandidatePool:
         if not run["report"] or any(q["blocking"] for q in run["questions"]):
             return {**base, "status": "needs_input", "reason": "비교에 필요한 조건을 먼저 확인해 줘."}
         assessments = run["report"]["assessments"]
-        eligible = [a for a in assessments if a["eligibility"] == "eligible"
+        eligible = [a for a in assessments if a["eligibility"] == "eligible" and has_selection_evidence(a)
                     and (a["score"] is not None or data.mode == 'exploratory')]
+        no_evidence_count = sum(a['eligibility']=='eligible' and not has_selection_evidence(a) for a in assessments)
+        base.update(eligible_count=len(eligible), no_selection_evidence_count=no_evidence_count,
+            hard_failed_count=sum(a['eligibility']=='ineligible' for a in assessments),
+            unverified_count=sum(a['eligibility']!='ineligible' and
+                (a['score'] is None or a['eligibility']=='unverified') for a in assessments),
+            source_run_id=run['run_id'], module_ids=[m['module_id'] for m in run['modules']],
+            source_candidate_fingerprint=run['candidates_fingerprint'],
+            module_requests=[{'module_id':m['module_id'], 'request_fingerprint':m['request_fingerprint'],
+                              'evidence_count':len(m['evidence'])} for m in run['modules']])
+        if data.mode=='exploratory' and not eligible and no_evidence_count:
+            return {**base, 'status':'needs_scope', 'reason_code':'no_selection_evidence',
+                    'reason':'지금 조건으로 지역을 고를 근거가 없어. 알아볼 지역을 정하고 조사할 지점을 직접 골라줘.',
+                    'ranking_status':'withheld', 'selected':[], 'next_action':'choose_area_and_point',
+                    'unverified_criteria':[p for p in plan if p['role']=='unverified']}
         # Keep original weights and sort the confirmed contribution; unknowns remain unknown.
         eligible.sort(key=lambda a: (-a['score_range'][0], -a['coverage'], a["candidate_id"]))
+        evidence = {e['id']:e for m in run['modules'] for e in m['evidence']}
+        tie_counts = {}
+        for a in eligible:
+            key = (a['score_range'][0], a['coverage'])
+            tie_counts[key] = tie_counts.get(key,0)+1
         selected = []
         for assessment in eligible:
             point = self.points[assessment["candidate_id"]]
@@ -113,17 +173,11 @@ class CandidatePool:
             if all(distance_m(c.latitude, c.longitude, other["candidate"].latitude,
                               other["candidate"].longitude) >= data.separation_m for other in selected):
                 selected.append({**point, "score": assessment["score"], 'score_range':assessment['score_range'],
-                                 'coverage':assessment['coverage']})
+                                 'coverage':assessment['coverage'],
+                                 'selection_reason':selection_reason(data.profile,assessment,evidence,
+                                     tie_counts[(assessment['score_range'][0],assessment['coverage'])]>1)})
             if len(selected) == data.count:
                 break
-        base.update(eligible_count=len(eligible),
-            hard_failed_count=sum(a["eligibility"] == "ineligible" for a in assessments),
-            unverified_count=sum(a["eligibility"] != "ineligible" and
-                (a["score"] is None or a["eligibility"] == "unverified") for a in assessments),
-            source_run_id=run["run_id"], module_ids=[m["module_id"] for m in run["modules"]],
-            source_candidate_fingerprint=run["candidates_fingerprint"],
-            module_requests=[{"module_id": m["module_id"], "request_fingerprint": m["request_fingerprint"],
-                              "evidence_count": len(m["evidence"])} for m in run["modules"]])
         partial = any(p['score'] is None for p in selected)
         base.update(ranking_status='withheld' if partial else run['report']['ranking_status'],
                     unverified_criteria=[p for p in plan if p['role'] == 'unverified'])
@@ -134,5 +188,6 @@ class CandidatePool:
                 "candidates": [p["candidate"].model_dump() for p in selected],
                 "selected": [{"candidate_id": p["candidate"].id, "score": p["score"],
                               "score_range": p['score_range'], "coverage":p['coverage'],
+                              "selection_reason":p['selection_reason'],
                               "area_code": p["area_code"], "cell": p["cell"],
                               "registered_shop_count": p["registered_shop_count"]} for p in selected]}
