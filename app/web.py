@@ -44,6 +44,7 @@ STATIC = ROOT / "app/static"
 class CompareInput(Contract):
     profile: NeedProfile
     candidates: Annotated[list[Candidate], Field(min_length=1, max_length=6)]
+    progress_id: Annotated[str, Field(pattern=r'^[a-zA-Z0-9_-]{1,80}$')] | None = None
 
 
 class IntakeInput(Contract):
@@ -356,7 +357,14 @@ class AppState:
 
     def compare(self, session, data):
         with session["lock"]:
-            run = self.orchestrator.run(data.profile, data.candidates)
+            def progress(event):
+                if data.progress_id:
+                    with self.lock:
+                        session['comparison_progress']['events'].append(dict(event))
+            if data.progress_id:
+                with self.lock:
+                    session['comparison_progress']={'id':data.progress_id,'events':[]}
+            run = self.orchestrator.run(data.profile, data.candidates, on_event=progress if data.progress_id else None)
             previous_job = session["review_job"]
             if previous_job and previous_job["status"] == "running":
                 previous_job["cancel"].set()
@@ -451,6 +459,8 @@ def make_handler(state, env_path):
                          "/workspace": (STATIC / "workspace.html", "text/html; charset=utf-8"),
                          '/analysis': (STATIC / 'analysis.html', 'text/html; charset=utf-8'),
                          '/analysis.mjs': (STATIC / 'analysis.mjs', 'text/javascript; charset=utf-8'),
+                         '/village-world.mjs': (STATIC / 'village-world.mjs', 'text/javascript; charset=utf-8'),
+                         '/village-journey.mjs': (STATIC / 'village-journey.mjs', 'text/javascript; charset=utf-8'),
                          '/analysis-view.mjs': (STATIC / 'analysis-view.mjs', 'text/javascript; charset=utf-8'),
                          '/entry-places.mjs': (STATIC / 'entry-places.mjs', 'text/javascript; charset=utf-8'),
                          '/debug-session.mjs': (STATIC / 'debug-session.mjs', 'text/javascript; charset=utf-8'),
@@ -499,6 +509,12 @@ def make_handler(state, env_path):
                         job = session["jobs"].get(path.removeprefix("/api/jobs/"))
                         result = state.public_job(job) if job else None
                     return self.send(200 if result else 404, result or {"error": "job_not_found"})
+                if path.startswith('/api/progress/'):
+                    _, session = state.session(self.headers.get('X-Session', ''))
+                    with state.lock:
+                        value=session.get('comparison_progress')
+                        result={'id':value['id'],'events':[dict(e) for e in value['events']]} if value and value['id']==path.removeprefix('/api/progress/') else None
+                    return self.send(200 if result else 404, result or {'error':'progress_not_found'})
                 if path == "/favicon.ico":
                     return self.send(204, b"", "image/x-icon")
                 return self.send(404, {"error": "not_found"})

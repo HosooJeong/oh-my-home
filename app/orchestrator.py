@@ -27,7 +27,7 @@ class Orchestrator:
             raise ValueError("reference registry key and module id differ")
 
     def run(self, profile: NeedProfile, candidates: list[Candidate], cancel: Event | None = None,
-            *, include_references: bool = True) -> dict:
+            *, include_references: bool = True, on_event=None) -> dict:
         profile = NeedProfile.model_validate(profile.model_dump())
         candidates = [Candidate.model_validate(c.model_dump()) for c in candidates]
         if len({c.id for c in candidates}) != len(candidates) or not candidates:
@@ -36,7 +36,12 @@ class Orchestrator:
         run_id = str(uuid4())
         identity = {"profile_fingerprint": profile.fingerprint(),
                     "candidates_fingerprint": digest([c.model_dump() for c in candidates])}
-        events = [{"stage": "planned", "run_id": run_id}]
+        events = []
+        def emit(event):
+            events.append(event)
+            if on_event:
+                on_event(dict(event))
+        emit({"stage": "planned", "run_id": run_id})
         if any(q.blocking for q in profile.questions):
             return {**identity, "run_id": run_id, "status": "awaiting_input", "events": events,
                     "questions": [q.model_dump() for q in profile.questions], "report": None,
@@ -58,12 +63,12 @@ class Orchestrator:
                                              for c in active if c.module_id == module_id],
                                     candidates=candidates)
             module = self.modules.get(module_id)
+            emit({"stage": "module_started", "module_id": module_id})
             if module is None:
                 result = CategoryResult(module_id=module_id, module_version="unimplemented",
                     request_fingerprint=request.fingerprint(), status="partial", evidence=[],
                     unsupported_criterion_ids=[c.id for c in request.criteria], questions=[], error_code="module_unavailable")
             else:
-                events.append({"stage": "module_started", "module_id": module_id})
                 try:
                     result = CategoryResult.model_validate(module.run(request.model_copy(deep=True), cancel).model_dump())
                     self._check_result(request, result, evidence_ids)
@@ -75,7 +80,7 @@ class Orchestrator:
             all_evidence.extend(result.evidence)
             evidence_ids.update(e.id for e in result.evidence)
             results.append(result.model_dump())
-            events.append({"stage": "module_finished", "module_id": module_id, "status": result.status})
+            emit({"stage": "module_finished", "module_id": module_id, "status": result.status})
         if cancel.is_set():
             return {**identity, "run_id": run_id, "status": "cancelled", "events": events,
                     "report": None, "modules": results, "questions": []}
@@ -84,6 +89,7 @@ class Orchestrator:
             try:
                 if hasattr(module, 'reference_requested') and not module.reference_requested(profile):
                     continue
+                emit({"stage": "reference_started", "module_id": module_id})
                 contract = SafetyReferenceResult if module_id == 'safety' else ReferenceResult
                 reference = contract.model_validate(module.run_reference(
                     profile.model_copy(deep=True), [c.model_copy(deep=True) for c in candidates], cancel).model_dump())
@@ -93,9 +99,9 @@ class Orchestrator:
                 if module_id == 'safety' and {o.candidate_id for o in reference.observations} != {c.id for c in candidates}:
                     raise ValueError('foreign reference candidates')
                 references.append(reference.model_dump())
-                events.append({"stage": "reference_finished", "module_id": module_id, "status": reference.status})
+                emit({"stage": "reference_finished", "module_id": module_id, "status": reference.status})
             except Exception:
-                events.append({"stage": "reference_failed", "module_id": module_id})
+                emit({"stage": "reference_failed", "module_id": module_id})
         if cancel.is_set():
             return {**identity, "run_id": run_id, "status": "cancelled", "events": events,
                     "report": None, "modules": results, "references": references, "questions": []}
@@ -106,7 +112,7 @@ class Orchestrator:
             report["ranking_status"] = "withheld"
         partial = any(r["status"] != "completed" for r in results) or any(
             d["status"] == "unknown" for a in report["assessments"] for d in a["details"])
-        events.append({"stage": "evaluated"})
+        emit({"stage": "evaluated"})
         status = "awaiting_input" if any(q["blocking"] for q in questions) else "partial" if partial else "completed"
         return {**identity, "run_id": run_id, "status": status,
                 "events": events, "report": report, "modules": results, "references": references, "questions": questions}

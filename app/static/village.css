@@ -89,4 +89,10 @@ label{display:block}input,textarea{width:100%;border:1px solid var(--line);backg
 #entry-coordinate{margin:20px 0;font-size:13px;color:var(--muted)}#entry-coordinate summary{cursor:pointer;min-height:28px}#entry-coordinate button{margin-top:12px}
 #map-pick{margin-top:12px;padding:12px 0;line-height:1.7}#map-pick p{font-size:14px}
 #discover-location{max-width:420px}#enter-town{margin-top:24px;min-height:50px}
+/* The same town stays beside the category interview. */
+.village-page main[data-mode=detail],.village-page main[data-mode=review]{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(300px,.8fr);gap:30px;align-items:start}
+.village-page main[data-mode=detail] .scene-wrap,.village-page main[data-mode=review] .scene-wrap{height:calc(100svh - 108px);min-height:510px;position:sticky;top:18px}
+.village-page main[data-mode=detail] .detail-panel,.village-page main[data-mode=review] .detail-panel{width:100%;margin:16px 0;min-width:0}
+.village-page .detail-top{margin-bottom:28px}.village-page .detail-panel h1{font-size:24px}
+@media(max-width:740px){.village-page main[data-mode=detail],.village-page main[data-mode=review]{display:block}.village-page main[data-mode=detail] .scene-wrap,.village-page main[data-mode=review] .scene-wrap{height:32svh;min-height:230px;position:relative;top:0}.village-page main[data-mode=detail] .detail-panel,.village-page main[data-mode=review] .detail-panel{padding:8px 10px 24px;margin:10px 0}.village-page .detail-panel h1{font-size:21px;margin-bottom:16px}.village-page .detail-panel textarea{min-height:135px}.village-page .detail-top{margin-bottom:14px}}
 @media(max-width:740px){.entry-location{padding:12px 8px 90px}.entry-location h1{font-size:26px;margin:10px 0 24px}.entry-location-grid{grid-template-columns:minmax(0,1fr);gap:20px}#entry-map{height:330px;grid-row:2;z-index:0}#enter-town{position:fixed;bottom:16px;left:18px;width:calc(100% - 36px);margin:0;z-index:2;box-shadow:0 4px 18px #263d3430}}

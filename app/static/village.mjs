@@ -1,5 +1,5 @@
 import {CATEGORIES,STORAGE_KEY,RADII,readDraft,buildRequest,evaluationShares as shares,levelForPosition,toggleCategory,moveBlock} from './village-model.mjs';
-import {createToyModels,addToyStudio} from './village-models.mjs';
+import {createVillageWorld} from './village-world.mjs';
 import {entryReady,addCandidate} from './entry-places.mjs';
 import {debugEvent} from './debug-session.mjs';
 
@@ -40,7 +40,7 @@ function save(){try{sessionStorage.setItem(STORAGE_KEY,JSON.stringify(draft));}c
 function snapshot(){
  const percentages=shares(draft.blocks);
  return {mode,coordinate_system:'virtual floor: origin=home; X/Z horizontal; Y height; camera never changes priorities',focus:draft.focus,
-  blocks:draft.blocks.map(b=>({...b,level:levelForPosition(b.x,b.z),share:percentages[b.id]})),candidate_count:draft.entry==='discover'?0:draft.candidates.length,entry_ready:entryReady(draft),camera_yaw:world?.yaw??null,dragging:world?.dragId??null,webgl:!!world?.available,motion};
+  blocks:draft.blocks.map(b=>({...b,level:levelForPosition(b.x,b.z),share:percentages[b.id]})),candidate_count:draft.entry==='discover'?0:draft.candidates.length,entry_ready:entryReady(draft),camera_yaw:world?.yaw??null,camera_pose:world?.pose??null,dragging:world?.dragId??null,webgl:!!world?.available,motion};
 }
 function expose(){const value=JSON.stringify(snapshot());$('scene-state').value=value;$('scene-state').textContent=value;}
 window.render_game_to_text=()=>JSON.stringify(snapshot());
@@ -54,11 +54,11 @@ for(const c of CATEGORIES){
 }
 function render(){
  $('village-app').dataset.mode=mode;
- $('scene-wrap').hidden=['location','detail','review'].includes(mode);
+ $('scene-wrap').hidden=mode==='location';
  $('entry-panel').hidden=mode!=='start';$('location-panel').hidden=mode!=='location';
  $('town-tools').hidden=mode!=='town';$('detail-panel').hidden=!['detail','review'].includes(mode);
  $('question-view').hidden=mode!=='detail';$('review-view').hidden=mode!=='review';
- $('change-start').hidden=mode!=='town';$('scene-controls').hidden=mode!=='town';
+ $('change-start').hidden=mode!=='town';$('scene-controls').hidden=mode!=='town';$('scene-wrap').querySelector('.scene-heading').hidden=['detail','review'].includes(mode);
  $('location-title').textContent=draft.entry==='discover'?'어느 생활권에서 찾을까?':draft.entry==='single'?'어느 집을 분석할까?':'어느 집들을 비교할까?';
  $('discover-location').hidden=draft.entry!=='discover';$('known-location').hidden=draft.entry==='discover';
  $('enter-town').disabled=!entryReady(draft);$('enter-town').firstChild.textContent=draft.entry==='discover'?'내 마을 만들기':draft.entry==='single'?'이 집으로 마을 만들기':'이 집들로 마을 만들기';
@@ -76,7 +76,7 @@ function render(){
   $('question-progress').textContent=`${order.length}/${order.length}`;$('answer-summary').replaceChildren();
   for(const id of order){const c=CATEGORIES.find(c=>c.id===id),row=document.createElement('div');row.className='answer-item';const name=document.createElement('strong'),percent=document.createElement('span'),answer=document.createElement('p');name.textContent=c.label;percent.textContent=id==='housing'?'참고':percentages[id]+'%';name.append(percent);answer.textContent=draft.answers[id]?.trim()||'아직 모르겠어';row.append(name,answer);$('answer-summary').append(row);}
  }
- world?.sync();expose();
+ world?.present({mode,focus:mode==='detail'?draft.focus:null});world?.sync();expose();
 }
 document.querySelectorAll('[data-entry]').forEach(b=>b.addEventListener('click',()=>{draft.entry=b.dataset.entry;draft.handoff=false;locationVersion++;pendingPlace=null;$('map-pick').hidden=true;$('address-results').replaceChildren();$('location-error').hidden=true;mode='location';save();render();debugEvent('entry_selected',{entry:draft.entry});if(draft.entry!=='discover')loadEntryMap();}));
 $('location-input').addEventListener('input',event=>{draft.location=event.target.value.slice(0,200);save();});
@@ -141,91 +141,5 @@ $('coordinate-form').addEventListener('submit',event=>{event.preventDefault();if
 
 try{
  const THREE=await import('./vendor/three/three.module.min.js');
- world=createWorld(THREE);render();
+ world=createVillageWorld(THREE,{canvas:$('village-canvas'),container:$('scene-wrap'),labelsRoot:$('block-labels'),fallback:$('fallback-note'),getDraft:()=>draft,getMode:()=>mode,onChange:render,onSave:save,onStatus:status,onState:expose});render();
 }catch(error){$('fallback-note').hidden=false;console.warn('Village 3D unavailable:',error.message);expose();}
-
-function createWorld(T){
- const canvas=$('village-canvas'),container=$('scene-wrap');
- const renderer=new T.WebGLRenderer({canvas,antialias:true,alpha:false});renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;renderer.setClearColor('#e9eee3');
- renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1;
- const scene=new T.Scene();scene.background=new T.Color('#e9eee3');
- const toys=createToyModels(T);addToyStudio(T,renderer,scene);
- const camera=new T.OrthographicCamera(-15,15,11,-11,.1,100);let yaw=Math.PI/4,zoomValue=1,elapsed=0,lastTime=0,drag=null,available=true,hovered=null,lastHover=-1;
- const materials=new Map();const boxGeometry=new T.BoxGeometry(1,1,1),studGeometry=new T.CylinderGeometry(.135,.135,.075,16),sphereGeometry=new T.SphereGeometry(1,12,8);
- function mat(color){if(!materials.has(color))materials.set(color,new T.MeshStandardMaterial({color,roughness:.72,metalness:0}));return materials.get(color);}
- function mesh(group,geometry,color,x,y,z,sx=1,sy=1,sz=1){const m=new T.Mesh(geometry,mat(color));m.position.set(x,y,z);m.scale.set(sx,sy,sz);m.castShadow=true;m.receiveShadow=true;group.add(m);return m;}
- function box(g,color,x,y,z,w,h,d){return mesh(g,boxGeometry,color,x,y,z,w,h,d);}
- function ball(g,color,x,y,z,r){return mesh(g,sphereGeometry,color,x,y,z,r,r,r);}
-
- scene.add(new T.HemisphereLight('#fff9e9','#77946d',1.4));
- const sun=new T.DirectionalLight('#fff4da',2.2);sun.position.set(-8,18,8);sun.castShadow=true;sun.shadow.mapSize.set(1536,1536);Object.assign(sun.shadow.camera,{left:-15,right:15,top:15,bottom:-15,near:.1,far:50});sun.shadow.bias=-.0005;sun.shadow.normalBias=.025;scene.add(sun);
- const island=new T.Group();scene.add(island);
- box(island,'#88a086',0,-.5,0,21,.65,21);box(island,'#afc2a3',0,-.12,0,20.7,.18,20.7);box(island,'#cddbc0',0,.01,0,20.3,.1,20.3);
- const studs=new T.InstancedMesh(studGeometry,mat('#c3d3b3'),1521),dummy=new T.Object3D();let n=0;
- for(let x=-9.5;x<=9.5;x+=.5)for(let z=-9.5;z<=9.5;z+=.5){dummy.position.set(x,.10,z);dummy.updateMatrix();studs.setMatrixAt(n++,dummy.matrix);}studs.receiveShadow=true;island.add(studs);
- // A perimeter walk leaves the priority placement area clear.
- for(const [x,z,w,d] of [[0,9,19,.65],[0,-9,19,.65],[9,0,.65,19],[-9,0,.65,19]])box(island,'#e5dfcd',x,.15,z,w,.1,d);
- function tree(g,x,z,scale=1){const a=toys.tree(x,z,scale);g.add(a);return a;}
- for(const [x,z,s] of [[-8,-6,1],[-6,-8,.85],[8,-6,.9],[7,8,1],[-8,6,.85],[5,-8,.75]])tree(island,x,z,s);
- for(const [x,z] of [[-8,3],[3,8]])toys.bench(island,x,z);
- const house=toys.home();house.position.y=.15;house.scale.setScalar(['start','location'].includes(mode)?1.65:1);scene.add(house);
- const models=new Map(),labels=new Map();
- function makeBlock(c){const g=toys.makeBlock(c);g.userData.category=c.id;g.position.y=.15;scene.add(g);models.set(c.id,g);
-  const label=document.createElement('span');label.className='block-label';const text=document.createElement('span'),percentage=document.createElement('small');text.textContent=c.short;label.append(text,percentage);$('block-labels').append(label);labels.set(c.id,{label,percentage});
- }
- CATEGORIES.forEach(makeBlock);
- const guide=new T.Group();scene.add(guide);
- for(const radius of RADII){const points=Array.from({length:96},(_,i)=>new T.Vector3(Math.cos(i/96*Math.PI*2)*radius,.2,Math.sin(i/96*Math.PI*2)*radius));guide.add(new T.LineLoop(new T.BufferGeometry().setFromPoints(points),new T.LineBasicMaterial({color:'#4c8a67',transparent:true,opacity:.38})));}guide.visible=false;
- const highlight=mesh(scene,new T.TorusGeometry(.98,.025,5,48),'#f8efbf',0,.19,0);highlight.rotation.x=Math.PI/2;highlight.visible=false;highlight.castShadow=false;
- const bus=toys.bus('#e3ba72',true);scene.add(bus);
- const people=[];for(const [x,z,color] of [[-3,9,'#cb8872'],[9,5,'#8cabc0']]){const p=toys.person(color);p.scale.setScalar(.75);p.position.set(x,.2,z);scene.add(p);people.push(p);}
- const raycaster=new T.Raycaster(),pointer=new T.Vector2(),floor=new T.Plane(new T.Vector3(0,1,0),-.15),point=new T.Vector3();
- function updateCamera(){const r=27;camera.position.set(Math.sin(yaw)*r,24,Math.cos(yaw)*r);camera.lookAt(0,0,0);camera.zoom=zoomValue;camera.updateProjectionMatrix();camera.updateMatrixWorld();}
- function resize(){const width=container.clientWidth,height=container.clientHeight;if(!width||!height||!available)return;const aspect=width/height,entry=['start','location'].includes(mode),mobile=width<740;
-  const v=entry?(mobile?14/aspect:Math.max(17.5,26/aspect)):Math.max(15,(mobile?14:18)/aspect),offset=entry&&!mobile?.22:0,verticalOffset=entry&&mobile?-v*.13:0;
-  camera.left=-v*aspect/2+v*aspect*offset;camera.right=v*aspect/2+v*aspect*offset;camera.top=v/2+verticalOffset;camera.bottom=-v/2+verticalOffset;
-  if(canvas.width!==Math.floor(width*renderer.getPixelRatio())||canvas.height!==Math.floor(height*renderer.getPixelRatio()))renderer.setSize(width,height,false);updateCamera();draw();}
- function sync(){
-  const percentages=shares(draft.blocks);
-  for(const c of CATEGORIES){const g=models.get(c.id),b=draft.blocks.find(v=>v.id===c.id),item=labels.get(c.id);g.visible=!!b&&mode==='town';item.label.hidden=!g.visible;
-   if(b){g.position.x=b.x;g.position.z=b.z;item.percentage.textContent=c.id==='housing'?'참고':percentages[c.id]+'%';item.label.classList.toggle('active',draft.focus===c.id);}}
-  const selected=draft.blocks.find(b=>b.id===draft.focus);highlight.visible=!!selected&&!['start','location'].includes(mode);if(selected)highlight.position.set(selected.x,.2,selected.z);
-  guide.visible=!!drag?.id;resize();
- }
- function hit(event){const b=canvas.getBoundingClientRect();pointer.set((event.clientX-b.left)/b.width*2-1,-(event.clientY-b.top)/b.height*2+1);raycaster.setFromCamera(pointer,camera);}
- function floorPoint(event){hit(event);return raycaster.ray.intersectPlane(floor,point);}
- function findBlock(event){hit(event);const intersection=raycaster.intersectObjects([...models.values()].filter(g=>g.visible),true)[0];if(!intersection)return null;let object=intersection.object;while(object&&!object.userData.category)object=object.parent;return object?.userData.category||null;}
- function cancelDrag(){if(drag?.id){const b=draft.blocks.find(b=>b.id===drag.id);if(b)Object.assign(b,drag.before);}drag=null;guide.visible=false;canvas.style.cursor='';sync();}
- canvas.addEventListener('pointerdown',event=>{
-  if(mode!=='town'||event.button!==0||drag)return;const id=findBlock(event),p=floorPoint(event);
-  if(id){const b=draft.blocks.find(b=>b.id===id);draft.focus=id;drag={id,before:{x:b.x,z:b.z},offset:p?{x:b.x-p.x,z:b.z-p.z}:{x:0,z:0},pointer:event.pointerId};}
-  else drag={id:null,lastX:event.clientX,pointer:event.pointerId};
-  canvas.setPointerCapture(event.pointerId);canvas.style.cursor=id?'grabbing':'ew-resize';render();event.preventDefault();
- });
- canvas.addEventListener('pointermove',event=>{
-  if(!drag){if(mode==='town'&&elapsed-lastHover>.08){lastHover=elapsed;hovered=findBlock(event);canvas.style.cursor=hovered?'grab':'ew-resize';}return;}
-  if(drag.pointer!==event.pointerId)return;
-  if(drag.id){const p=floorPoint(event);if(p&&moveBlock(draft,drag.id,p.x+drag.offset.x,p.z+drag.offset.z)){draft.handoff=false;render();}}
-  else{yaw-=(event.clientX-drag.lastX)*.008;drag.lastX=event.clientX;updateCamera();draw();expose();}
- });
- canvas.addEventListener('pointerleave',()=>{if(!drag){hovered=null;canvas.style.cursor='';}});
- function finishDrag(event){if(!drag||drag.pointer!==event.pointerId)return;const id=drag.id;drag=null;guide.visible=false;canvas.style.cursor='';if(id)models.get(id).userData.landed=elapsed;save();render();if(id){const b=draft.blocks.find(b=>b.id===id);status(`${CATEGORIES.find(c=>c.id===id).label} · 중요도 ${6-levelForPosition(b.x,b.z)}/5`);}}
- canvas.addEventListener('pointerup',finishDrag);canvas.addEventListener('pointercancel',()=>{cancelDrag();render();});canvas.addEventListener('lostpointercapture',event=>{if(drag&&drag.pointer===event.pointerId){cancelDrag();render();}});
- canvas.addEventListener('wheel',event=>{if(mode!=='town')return;event.preventDefault();zoomValue=Math.min(2.8,Math.max(.8,zoomValue*Math.exp(-event.deltaY*.001)));updateCamera();draw();},{passive:false});
- function draw(){
-  if(container.hidden||!available)return;
-  renderer.render(scene,camera);const width=container.clientWidth,height=container.clientHeight;
-  for(const c of CATEGORIES){const g=models.get(c.id),item=labels.get(c.id);if(!g.visible)continue;const p=new T.Vector3(g.position.x,g.position.y+(g.userData.labelHeight||2.15),g.position.z).project(camera);const x=(p.x+1)/2*width,y=(1-p.y)/2*height;item.label.style.left=x+'px';item.label.style.top=y+'px';item.label.hidden=x<35||x>width-35||y<20||y>height-40;}
- }
- function advance(dt){elapsed+=dt;if(motion){const t=elapsed*.17%4;if(t<1){bus.position.set(-8+t*16,.35,9);bus.rotation.y=0;}else if(t<2){bus.position.set(9,.35,9-(t-1)*17);bus.rotation.y=Math.PI/2;}else if(t<3){bus.position.set(9-(t-2)*17,.35,-9);bus.rotation.y=Math.PI;}else{bus.position.set(-9,.35,-9+(t-3)*17);bus.rotation.y=-Math.PI/2;}people[0].position.x=-3+Math.sin(elapsed*.3)*1.2;people[1].position.z=5+Math.sin(elapsed*.25)*.9;}
-  const blend=motion?1-Math.exp(-dt*18):1,targetHouse=['start','location'].includes(mode)?1.65:1;house.scale.setScalar(T.MathUtils.lerp(house.scale.x,targetHouse,blend));
-  for(const [id,g] of models){const held=drag?.id===id,age=elapsed-(g.userData.landed??-10),bounce=motion&&age<.8?Math.sin(age*17)*Math.exp(-age*8)*.16:0;
-   g.position.y=T.MathUtils.lerp(g.position.y,.15+(held?.42:Math.max(0,bounce)),blend);const scale=held?1.045:hovered===id?1.018:1;g.scale.setScalar(T.MathUtils.lerp(g.scale.x,scale,blend));
-   g.rotation.x=T.MathUtils.lerp(g.rotation.x,held?-.045:0,blend);g.rotation.z=T.MathUtils.lerp(g.rotation.z,held?.035:0,blend);
-  }draw();}
- function loop(time){if(!document.hidden&&!container.hidden&&available)advance(Math.min((time-lastTime)/1000,.05));lastTime=time;requestAnimationFrame(loop);}
- new ResizeObserver(resize).observe(container);document.addEventListener('fullscreenchange',resize);
- canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();cancelDrag();available=false;$('fallback-note').hidden=false;render();status('3D 연결이 끊겼어. 화면을 새로고침해 봐.');});
- updateCamera();sync();requestAnimationFrame(loop);
- return {sync,cancelDrag,advance,get available(){return available;},get yaw(){return yaw;},get dragId(){return drag?.id||null;},rotate(amount){if(drag)return;yaw+=amount;updateCamera();draw();expose();},zoom(factor){zoomValue=Math.min(2.8,Math.max(.8,zoomValue*factor));updateCamera();draw();}};
-}
