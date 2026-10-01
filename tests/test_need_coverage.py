@@ -140,14 +140,17 @@ class NeedCoverageTests(unittest.TestCase):
 
     def test_a_real_but_unrelated_source_does_not_cover_another_request(self):
         request='마트의 직선거리 0m가 이상적이고 1500m면 만족도 0이야. 가족 모임 공간이 필요해.'
-        with self.assertRaisesRegex(RunnerError,'unrelated_need_coverage'):
-            prepare_profile(FakeRunner(draft(needs=[need(),need('other',source='s2')])),request)
+        p=prepare_profile(FakeRunner(draft(needs=[need(),need('other',source='s2')])),request)
+        self.assertTrue(p.questions[0].blocking)
+        self.assertIn('가족 모임',p.questions[0].text)
+        self.assertEqual(Orchestrator({'living':LivingModule(index())}).run(p,candidates())['status'],'awaiting_input')
 
     def test_a_real_but_unrelated_context_is_not_a_research_mapping(self):
         request='마트의 직선거리 0m가 이상적이고 1500m면 만족도 0이야. 큰 마트 후기를 인용해 줘.'
-        with self.assertRaisesRegex(RunnerError,'unrelated_need_coverage'):
-            prepare_profile(FakeRunner(draft(context=[dict(key='qualitative_research_requested',value='requested',source_id='s1')],
-                needs=[need(),need('facility_fit','research',ids=(),keys=('qualitative_research_requested',),source='s2')])),request)
+        p=prepare_profile(FakeRunner(draft(context=[dict(key='qualitative_research_requested',value='requested',source_id='s1')],
+            needs=[need(),need('facility_fit','research',ids=(),keys=('qualitative_research_requested',),source='s2')])),request)
+        self.assertTrue(p.questions[0].blocking)
+        self.assertIn('후기',p.questions[0].text)
 
     def test_unconfirmed_exclusion_is_rejected_and_explicit_exclusion_is_kept(self):
         c=criterion('size','store_size_unverified',importance=0.0,utility=None)

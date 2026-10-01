@@ -222,8 +222,12 @@ def prepare_profile(runner: CodexRunner, request: str, answers: list[InterviewTu
     required_ids=required_sources(sources)
     if previous:
         for c in [*previous.criteria, *previous.context]:
-            if c.source_quote not in sources.values():
-                sources['s' + str(len(sources) + 1)] = c.source_quote
+            quotes=[c.source_quote]
+            if hasattr(c,'source_evidence'):
+                quotes.extend(q for binding in c.source_evidence for q in binding.quotes)
+            if hasattr(c,'source_quotes'):quotes.extend(c.source_quotes)
+            for quote in quotes:
+                if quote not in sources.values():sources['s' + str(len(sources) + 1)] = quote
     data = {'sources':sources, 'required_source_ids':required_ids, 'previous':previous.model_dump() if previous else None,
             'answers':[a.model_dump() for a in answers]}
     compact_rules = '''\n출력은 IntakeDraft다. request/revision/schema_version/module_id/source_quote를 출력하지 마라.
@@ -234,6 +238,18 @@ label/need는 간결히 쓰고 원문을 반복하지 마라. 집·비용 참고
 criteria는 추가하지 않고 context housing_reference=requested를 남겨라.
 다른 분야의 니즈는 보존하라. 이전 criteria의 id는 유지하라. 원문/정체성과 검증은 앱이 붙인다.
 needs는 원문 요구별 처리표다. required_source_ids의 모든 원문에 대해 하나 이상의 항목을 반환하라.
+field는 그 문장이 무엇의 근거인지 나타낸다: need(대상/요구), utility(거리/평가 기준),
+importance(조건 간 비중), hard(명시 필수 제한), parameters(유형/과목), context(배경/참고/조사).
+같은 조건의 대상·기준·비중이 여러 문장에 나뉘어 있으면 같은 criterion_ids에 field별로 연결하라.
+예: 마트 대상 s1, 500m/2000m 기준 s2, 마트70%/편의점30% s3는 같은 마트 조건의
+need/utility/importance 근거다. s3를 별도 점수 조건으로 만들지 마라.
+source_id는 주 근거 한 문장이며 나머지 실제 근거들은 needs의 source_id/field로 보존한다.
+한 문장이 여러 요소의 근거라면 같은 source_id로 field별 항목을 반환할 수 있다.
+utility/hard의 수치와 importance_source=user인 비중은 그 field의 원문에 실제로 있어야 한다.
+거리 목표만 있고 불편한 최대거리 기준이 없으면 utility=null과 짧은 질문을 반환하라.
+사용자가 조건 내부 비중을 말하지 않았다면 importance_source=proposed로 두어라.
+category scaffold의 분야 중요도는 groups의 weight이며 개별 criteria의 user importance 근거가 아니다.
+공원/도서관 유형이 상관없다는 말은 parameters의 any 근거이고 조건 전체 제외가 아니다.
 한 원문에 다른 요구가 있으면 항목을 분리하라. source_id는 원문, group_id는 해당 분야(배경은 null)다.
 aspect는 straight_distance(명시 직선거리), facility_count(등록 개소), facility_fit(규모/품목/이용형태),
 walking_route(실제 도보), travel_time(목적지 이동시간), transfer(환승), school_assignment(배정),
@@ -250,12 +266,17 @@ reference/research 자체를 점수 조건으로 만들지 마라. research는 �
 사용자가 실제로 요구한 수치/필수 제약을 모두 보존하고 기준이 없으면 미확인 또는 짧은 질문으로 남겨라.
 명시 필수인 미지원 조건은 원문 조건 충족 여부를 boolean ideal=1/limit=0/unit=bool, hard eq=1로 보존할 수 있다.
 이는 원문 제약의 충족 여부이며 임의 이동시간·품질 만족도 곡선을 만들라는 뜻이 아니다.
-needs에 연결하는 조건/맥락은 그 원문의 내용이어야 한다. 원문 id가 맞다는 이유로 다른 요구를 연결하지 마라.'''
+needs에 연결하는 조건/맥락은 그 원문의 내용이어야 한다. 원문 id가 맞다는 이유로 다른 요구를 연결하지 마라.
+field=context의 조사 요청은 같은 유형의 여러 원문을 같은 요청 플래그에 연결할 수 있다.
+사용자가 후기 조사만 원하면 참고 context로 보존하고 취미 적합성 점수 조건을 만들지 마라.'''
     profile = runner.run(INSTRUCTIONS + compact_rules + "\n입력(JSON):\n" + json.dumps(data, ensure_ascii=False),
                          IntakeDraft, search=False, **runner_options)
     need_records=profile.needs if isinstance(profile,IntakeDraft) else None
     if isinstance(profile, IntakeDraft):
-        runner.last_metadata['intake_format'] = 'compact_sources_v2'
+        # Logged v2 drafts and offline fixtures remain readable; fresh native output must use the new role contract.
+        if isinstance(runner,CodexRunner) and any('field' not in n.model_fields_set for n in profile.needs):
+            raise RunnerError('invalid_intake_contract')
+        runner.last_metadata['intake_format'] = 'compact_sources_v3_fields'
         try:
             profile = expand_draft(profile, request, revision, sources)
         except RunnerError as error:

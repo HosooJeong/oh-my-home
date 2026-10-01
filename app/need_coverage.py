@@ -3,8 +3,9 @@ import re
 from hashlib import sha256
 from typing import Annotated, Literal
 from pydantic import Field
-from .contracts import Contract, Identifier, NeedProfile
+from .contracts import Contract, Identifier, NeedProfile, NeedField
 from .codex_runner import RunnerError
+from .source_bindings import bind_fields
 
 Aspect = Literal['straight_distance','facility_count','facility_fit','walking_route',
                  'travel_time','transfer','school_assignment','environment','housing','other']
@@ -18,6 +19,7 @@ class IntakeNeed(Contract):
     criterion_ids: Annotated[list[Identifier], Field(max_length=10)]
     context_keys: Annotated[list[Identifier], Field(max_length=10)]
     resolution_source_id: Identifier | None
+    field: NeedField = 'need'
 
 
 METRIC_ASPECTS = {
@@ -80,20 +82,11 @@ def review_needs(profile, sources, needs=None, required_ids=(), previous=None, a
                 or set(n.criterion_ids)-criteria.keys() or set(n.context_keys)-contexts
                 or n.group_id is not None and n.group_id not in groups):
             raise RunnerError('invalid_need_coverage_reference')
-        text=sources[n.source_id]
-        resolved=sources[n.resolution_source_id] if n.resolution_source_id else text
-        for id in n.criterion_ids:
-            c=criteria[id]
-            same_source=any(c['source_quote'] in t or t in c['source_quote'] for t in (text,resolved))
-            continued=previous and any(old.id==id and (text in old.source_quote or old.source_quote in text)
-                                       for old in previous.criteria)
-            if not same_source and not continued:raise RunnerError('unrelated_need_coverage')
-        for key in n.context_keys:
-            facts=[c for c in doc['context'] if c['key']==key]
-            same_source=any(c['source_quote'] in t or t in c['source_quote'] for c in facts for t in (text,resolved))
-            continued=previous and any(old.key==key and (text in old.source_quote or old.source_quote in text)
-                                       for old in previous.context)
-            if not same_source and not continued:raise RunnerError('unrelated_need_coverage')
+
+    needs,uncertain,field_issues=bind_fields(doc,sources,needs,previous,answers)
+    # bind_fields attaches provenance to this same document; keep its fields through restoration.
+    criteria={c['id']:c for c in doc['criteria']}
+    for n in needs:
         if n.handling=='excluded':
             resolution=sources[n.resolution_source_id or n.source_id]
             prior_excluded=previous and n.criterion_ids and all(
@@ -123,6 +116,11 @@ def review_needs(profile, sources, needs=None, required_ids=(), previous=None, a
             for id in n.criterion_ids:
                 c=criteria[id]
                 if not (c['importance']>0 and groups[c['group_id']]['weight']>0 or c['hard']):continue
+                if n.field in ('utility','importance','hard','parameters'):
+                    return True
+                # Older recorded drafts lack the field tag; a local weight qualifier is not a new need.
+                if 'field' not in n.model_fields_set and re.search(r'비중|중요도|\d\s*%',sources[source]):
+                    return True
                 if c['metric'] not in METRIC_ASPECTS or METRIC_ASPECTS[c['metric']]==aspect:
                     # An unknown preference cannot stand in for a mandatory requirement.
                     if c['metric'] not in METRIC_ASPECTS and MANDATORY.search(sources[source]) and not c['hard']:continue
@@ -172,23 +170,26 @@ def review_needs(profile, sources, needs=None, required_ids=(), previous=None, a
     missing=[source for source in required_ids if not by_source[source]] if compact else []
     unclear=[n.source_id for n in needs if n.handling=='clarify' and not any(
         set(q['criterion_ids']) & set(n.criterion_ids) for q in doc['questions'])]
-    pending=list(dict.fromkeys(missing+unclear))
+    pending=list(dict.fromkeys(missing+unclear+list(uncertain)))
     if pending:
         # Keep omitted text and ask once; never treat an unexplained omission as a completed analysis.
-        for source in missing:
-            doc['context'].append(dict(key='unresolved_request',value=sources[source],source_quote=sources[source]))
-        question={'id':'need_coverage_review','text':'이 내용에서 비교할 조건이나 참고할 내용을 알려줘: '+
+        for source in list(dict.fromkeys(missing+list(uncertain))):
+            if not any(c['key']=='unresolved_request' and c['source_quote']==sources[source] for c in doc['context']):
+                doc['context'].append(dict(key='unresolved_request',value=sources[source],source_quote=sources[source]))
+        question={'id':'need_coverage_review','text':'이 내용의 대상·거리 기준·비중을 어떻게 적용할까? '+
                   ' / '.join(sources[s] for s in pending)[:1200],
-                  'reason':'AI가 이 요청의 처리 방법을 정리하지 못했어. 원문은 유지했어.',
+                  'reason':'조건의 연결이나 기준을 확인해야 해. 입력한 원문은 그대로 남아 있어.',
                   'criterion_ids':list(dict.fromkeys([r['criterion_id'] for r in repairs if r['source_id'] in pending]+
                       [id for n in needs if n.source_id in pending for id in n.criterion_ids]+
+                      [id for ids in uncertain.values() for id in sorted(ids)]+
                       [c['id'] for c in criteria.values() if any(c['source_quote']==sources[s] for s in pending)])),
                   'blocking':True}
         # A second incomplete interview response must not duplicate the stable review question ID.
         doc['questions']=[q for q in doc['questions'] if q['id']!=question['id']]
         if len(doc['questions'])>=10:raise RunnerError('unaccounted_request_needs')
-        doc['questions'].append(question)
+        doc['questions'].insert(0,question)
     if len(doc['criteria'])>50 or len(doc['groups'])>20:raise RunnerError('too_many_unresolved_needs')
     return NeedProfile.model_validate(doc),{'coverage_mode':'source_mapping' if compact else 'legacy_scope_checks',
         'source_count':len(required_ids),'mapped_source_count':len(required_ids)-len(missing) if compact else None,
-        'restored_count':len(repairs),'unresolved_source_count':len(pending)}
+        'restored_count':len(repairs),'unresolved_source_count':len(pending),
+        'field_binding_issues':field_issues,'unresolved_binding_count':len(uncertain)}

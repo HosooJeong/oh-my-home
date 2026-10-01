@@ -67,6 +67,15 @@ class MetricParameters(TypedDict, total=False):
     meeting_longitude: Annotated[str, Field(max_length=200)] | None
 
 
+NeedField = Literal['need', 'utility', 'importance', 'hard', 'parameters', 'context']
+
+
+class SourceBinding(Contract):
+    """Exact original clauses, grouped by the part of a need they support."""
+    field: NeedField
+    quotes: Annotated[list[Text], Field(min_length=1, max_length=12)]
+
+
 class Criterion(Contract):
     id: Identifier
     group_id: Identifier
@@ -74,6 +83,7 @@ class Criterion(Contract):
     label: Text
     need: Text
     source_quote: Text
+    source_evidence: Annotated[list[SourceBinding], Field(max_length=6)] = Field(default_factory=list)
     source: Literal["user", "proposed"]
     importance: Weight
     importance_source: Literal["user", "proposed"]
@@ -108,6 +118,7 @@ class ContextFact(Contract):
     key: Identifier
     value: Text
     source_quote: Text
+    source_quotes: Annotated[list[Text], Field(max_length=12)] = Field(default_factory=list)
 
 
 class NeedProfile(Contract):
