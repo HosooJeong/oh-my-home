@@ -16,6 +16,7 @@ from .codex_runner import RunnerError
 from .modules.leisure import ACTIVITIES
 from .research_policy import SourcePage, admissible_excerpt, normalize, publication_dates, today, MAX_AGE_DAYS
 from .reviews import NoRedirect, VisibleText
+from .response_validation import make_claim, verify_claims, form_reason, accepted_decision, verification_fields
 
 AGENT = 'SaljariLeisureCheck/0.1'
 Text = Annotated[str, Field(min_length=1,max_length=300)]
@@ -120,7 +121,7 @@ def research_leisure(runner,scope,*,cancel,index,fetcher=fetch_page):
     if cancel.is_set(): raise RunnerError('cancelled')
     answer=runner.run(INSTRUCTIONS+f'\n오늘 {today().isoformat()}, 작성 {MAX_AGE_DAYS}일 이내 원문만 보완 근거로 사용.\n입력 JSON:\n'
         +json.dumps(scope,ensure_ascii=False),LeisureResearchResponse,search=True,cancel=cancel,retries=0)
-    pages,used,found,rejected,reasons={}, {}, {}, 0, {}
+    pages,used,found,rejected,reasons,claims={}, {}, {}, 0, {}, []
     for item in answer.facilities:
         if cancel.is_set(): raise RunnerError('cancelled')
         url=public_url(item.source_url); reason=None
@@ -165,8 +166,28 @@ def research_leisure(runner,scope,*,cancel,index,fetcher=fetch_page):
             'excerpts':[dict(quote=item.quote,interpretation=item.interpretation,title=item.title,published_date=item.published_date)] if dated else [],
             'note':'원문·지점·주소·종목을 대조한 보완 자료이며 현재 이용/필수조건 충족은 미확인이야.' if dated else
                    '원문의 지점·주소를 대조한 발견 후보야. 작성일이 없어 최신 이용 형태/경험 근거로 채택하지 않았어.'}
+        if dated:
+            forms=request.get('forms',[]) if request else scope.get('forms',{}).get(item.activity,[])
+            form_error=form_reason(forms,item.quote)
+            if form_error:
+                found[key].update(status='request_unverified',excerpts=[],note='시설·주소·종목은 대조했지만 요청한 이용 형태는 미확인이야.')
+                rejected+=1;reasons[form_error]=reasons.get(form_error,0)+1
+            else:
+                claim=make_claim('leisure',{'name':item.name,'address':item.address,'activity':item.activity,
+                    'activity_name':activity_name},item.model_dump(),page,request.get('questions',[]) if request else [],forms)
+                claims.append(claim);found[key]['_claim_id']=claim['claim_id']
         used[url]=used.get(url,0)+len(item.quote.split())
+    decisions,validation=verify_claims(runner,claims,cancel)
+    for discovery in found.values():
+        if '_claim_id' not in discovery:continue
+        decision=decisions[discovery.pop('_claim_id')]
+        if accepted_decision(decision):
+            discovery['excerpts']=[{**x,**verification_fields(decision)} for x in discovery['excerpts']]
+        else:
+            discovery.update(status='request_unverified',excerpts=[],note='시설 발견과 요청 조건의 근거를 구분했어. 관련성·AI 해석 검토를 통과하지 못해 조건은 미확인이야.')
+            rejected+=1;reasons[decision['reason']]=reasons.get(decision['reason'],0)+1
     if cancel.is_set(): raise RunnerError('cancelled')
     return {'discoveries':list(found.values()),'rejected_count':rejected,'rejection_reasons':reasons,
             'scope':scope,'checked_at':datetime.now(timezone.utc).isoformat(),'score_eligible':False,
-            'status':'found' if found else 'unverified' if rejected else 'not_found'}
+            'response_validation':validation,
+            'status':'partial' if found and rejected else 'found' if found else 'unverified' if rejected else 'not_found'}

@@ -145,8 +145,8 @@ def build_research_plan(profile,candidates,enriched,targets,leisure_scope,educat
             'status_meaning':'Execution and source acceptance; not proof that an excerpt answers every question.'}
 
 
-def evidence_status(module,value):
+def evidence_status(module,value,request_id=None):
     items=value.get('items',[]) if module in ('living','education','facility_reviews','safety') else value.get('discoveries',[])
-    if any(i.get('excerpts') for i in items):return 'found'
-    if any(i.get('status') in ('unverified','discovered_date_unknown') or i.get('rejected_count',0) or i.get('rejection_reasons') for i in items) or value.get('rejected_count',0):return 'unverified'
+    if any(request_id is None or request_id in x.get('request_ids',[]) for i in items for x in i.get('excerpts',[])):return 'found'
+    if any(i.get('status') in ('unverified','discovered_date_unknown','request_unverified') or i.get('rejected_count',0) or i.get('rejection_reasons') for i in items) or value.get('rejected_count',0):return 'unverified'
     return 'not_found'

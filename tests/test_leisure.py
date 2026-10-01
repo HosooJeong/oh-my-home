@@ -14,6 +14,7 @@ from app.codex_runner import RunnerError
 from app.web import AppState, CompareInput, PreferenceInput
 from app.intake import prepare_profile
 from test_living import candidates, index, profile
+from research_fixture import supported_review
 
 
 def settings(**changes):
@@ -42,7 +43,10 @@ def excerpt(**changes):
 class RunnerFixture:
     last_metadata={'web_search_count':1}
     def __init__(self,*items): self.answer=LeisureResearchResponse(facilities=list(items))
-    def run(self,prompt,model,**options): self.prompt,self.options=prompt,options;return self.answer
+    def run(self,prompt,model,**options):
+        review=supported_review(prompt,model)
+        if review is not None:return review
+        self.prompt,self.options=prompt,options;return self.answer
 
 
 SCOPE={'city':'진주시','areas':['가상동'],'activities':['pilates'],'forms':{'pilates':['기구 소그룹']},'registered_leads':[]}

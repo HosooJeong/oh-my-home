@@ -192,7 +192,7 @@ class RequestExecutionTests(unittest.TestCase):
         for q,target in [('마트 알레르기 표기','grocery'),('편의점 휠체어 출입','convenience')]:
             fact(p,'living_research_question',q,q);fact(p,'living_research_target',target,q)
         def search(runner,rows,**kw):
-            return {'items':[{'facility_id':r['id'],'excerpts':[{'quote':'fixture'}] if r['id']=='shops:a' else [],'status':'not_found'} for r in rows]}
+            return {'items':[{'facility_id':r['id'],'excerpts':[{'quote':'fixture','request_ids':[q['request_id'] for q in kw['questions'] if r['id'] in q['facility_ids']]}] if r['id']=='shops:a' else [],'status':'not_found'} for r in rows]}
         with patch('app.web.research_reviews',side_effect=search):
             app.compare(session,CompareInput(profile=p,candidates=candidates()));done=wait_job(app,session)
         by={r['question']:r['evidence_status'] for r in done['request_statuses']}

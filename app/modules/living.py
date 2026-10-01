@@ -16,6 +16,7 @@ METRICS = {
 }
 CONVENIENCE_BRAND = re.compile(r"^(gs25|지에스25|cu|씨유|세븐일레븐|이마트24|미니스톱)", re.I)
 SUPERMARKET_BRAND = re.compile(r"^(gs더프레시|지에스더프레시|gs수퍼|이마트에브리데이|홈플러스익스프레스)", re.I)
+CLOTHING_BRAND = re.compile(r'^(?:신성통상)?(?:topten|탑텐)', re.I)
 SOURCE = "https://www.data.go.kr/data/15083033/fileData.do"
 
 
@@ -37,6 +38,8 @@ class ShopIndex:
                 raise ValueError("untraceable inventory")
             self.records[row["id"]] = row
             compact_name = re.sub(r"\s+", "", row["name"])
+            if row['detail'] in ('슈퍼마켓','편의점') and CLOTHING_BRAND.match(compact_name):
+                self.conflicts[row['id']]='의류 브랜드 상호와 장보기 업종의 충돌이 의심돼. 동일 시설 대조 전에는 장보기 근거로 확정하지 않아.'
             if row["detail"] in ("슈퍼마켓", "편의점") and "전자담배" in compact_name:
                 self.conflicts[row["id"]] = "상호에 전자담배가 포함돼 업종 분류와 충돌이 의심돼. 장보기 시설인지 확인이 필요해."
             if row["detail"] == "편의점" and SUPERMARKET_BRAND.match(compact_name):
@@ -65,6 +68,8 @@ class ShopIndex:
     def metadata(self):
         return {"shop_count": len(self.records), "counts": {k: len(v) for k, v in self.groups.items()},
                 "excluded_ambiguous": self.excluded_ambiguous, "conflicting_count": len(self.conflicts),
+                'classification_review_queue':[{'id':id,'name':self.records[id]['name'],'source_detail':self.records[id]['detail'],
+                    'source_url':self.records[id]['source_url'],'reason':reason} for id,reason in sorted(self.conflicts.items())],
                 "generated_at": self.generated_at,
                 "source_url": SOURCE, "data_dates": sorted({r["date"] for r in self.records.values()}),
                 "filter": "슈퍼마켓 업종 중 편의점 브랜드 접두어를 제외. 편의점은 원본 편의점 업종만 사용.",
@@ -72,7 +77,7 @@ class ShopIndex:
 
 
 class LivingModule:
-    id, version = "living", "m1-1"
+    id, version = "living", "m1-2"
 
     def __init__(self, index):
         self.index = index
@@ -104,7 +109,7 @@ class LivingModule:
                     status="conflicting" if conflict else "verified" if row else "missing", source_url=row["source_url"] if row else None,
                     source_record=row["id"] if row else None, data_date=row["date"] if row else None,
                     retrieved_at=now if row else None,
-                    method="haversine_mean_earth_6371008.8m / jinju_inventory / industry_filter_v1 / name_conflict_v1", note=note))
+                    method="haversine_mean_earth_6371008.8m / jinju_inventory / industry_filter_v1 / name_conflict_v2", note=note))
         partial = unsupported or any(e.status != "verified" for e in evidence)
         return CategoryResult(module_id=self.id, module_version=self.version,
             request_fingerprint=request.fingerprint(), status="partial" if partial else "completed",

@@ -13,6 +13,7 @@ from app.safety_research import (research_safety, official_url, parse_official_a
 from app.research_policy import today, SourcePage
 from app.orchestrator import Orchestrator
 from app.codex_runner import RunnerError
+from research_fixture import supported_review
 from app.web import AppState, CompareInput, PreferenceInput
 from test_living import profile, candidates, index
 
@@ -48,6 +49,8 @@ class RunnerFixture:
         self.last_metadata = {'web_search_count':search_count}
         self.prompt = None
     def run(self,prompt,model,**options):
+        review=supported_review(prompt,model)
+        if review is not None:return review
         self.prompt,self.options=prompt,options; return self.answer
 
 

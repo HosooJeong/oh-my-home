@@ -324,7 +324,9 @@ class AppState:
                                 scoped={**value,'items':[i for i in value.get('items',[]) if i['facility_id'] in record['facility_ids']]}
                             elif module=='leisure' and record['criterion_ids']:
                                 scoped={**value,'discoveries':[i for i in value.get('discoveries',[]) if i.get('criterion_id') in record['criterion_ids']]}
-                            mark([record['id']],'completed',evidence=evidence_status(module,scoped))
+                            mark([record['id']],'completed',
+                                 reason='response_validation_failed' if value.get('response_validation',{}).get('status')=='failed' else None,
+                                 evidence=evidence_status(module,scoped,record['id']))
                     except Exception as error:
                         if cancel.is_set():
                             mark([r['id'] for r in statuses if r['status'] in ('queued','running')],'cancelled','cancelled')

@@ -9,6 +9,7 @@ from app.reviews import (ReviewInput, ReviewExcerpt, ReviewResponse, StoreReview
 from app.web import AppState, CompareInput, IntakeInput, PreferenceInput
 from app.research_policy import SourcePage
 from test_living import index, profile, candidates
+from research_fixture import supported_review
 
 
 def excerpt(**changes):
@@ -25,6 +26,8 @@ class Runner:
         self.excerpts = [excerpt()] if excerpts is None else excerpts
         self.calls = []
     def run(self, prompt, response_type, **kwargs):
+        review=supported_review(prompt,response_type)
+        if review is not None:return review
         self.calls.append((prompt, kwargs))
         return ReviewResponse(items=[StoreReviews(facility_id="shops:a", excerpts=self.excerpts)])
 

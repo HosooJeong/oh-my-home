@@ -14,6 +14,7 @@ from .contracts import Contract
 from .modules.safety import TOPICS
 from .research_policy import SourcePage, admissible_excerpt, normalize, prompt_rules, MAX_AGE_DAYS
 from .reviews import NoRedirect
+from .response_validation import make_claim, verify_claims, regional_quote_reason, accepted_decision, verification_fields
 
 DOMAINS = ['www.jinju.go.kr']  # First provider, not an exhaustive safety/environment search.
 AGENT = 'SaljariOfficialResearch/0.1'
@@ -136,7 +137,7 @@ def research_safety(runner, targets, *, cancel, fetcher=fetch_official_article):
     expected = {t['area_code']:t for t in targets}
     if len(answer.items) != len(expected) or {i.area_code for i in answer.items} != set(expected):
         raise RunnerError('invalid_response')
-    pages, used, items = {}, {}, []
+    pages, used, items, claims = {}, {}, [], []
     keywords = {'night':('야간','방범','안심','조명'), 'traffic':('사고','횡단','보행','어린이보호','교통안전'),
                 'flood':('침수','홍수','집중호우','재해','재난'), 'noise':('소음',), 'air':('미세먼지','대기질','대기환경','대기오염')}
     for item in answer.items:
@@ -158,16 +159,32 @@ def research_safety(runner, targets, *, cancel, fetcher=fetch_official_article):
                     # Both region and issue must occur in article content; no city-wide fallback.
                     if target['area_name'] not in compact: reason = 'area_unverified'
                     elif not any(k in excerpt.quote for k in keywords[excerpt.topic]): reason = 'topic_unverified'
+                    else:reason=regional_quote_reason(page,excerpt.quote,target['area_name'])
             if reason:
                 reasons[reason] = reasons.get(reason,0)+1; continue
             used[url] = used.get(url,0)+words
+            claim=make_claim('safety',{'area_code':item.area_code,'area_name':target['area_name'],
+                'topics':target['topics']},excerpt.model_dump(),pages[url],target.get('questions',[]))
+            claims.append(claim)
             accepted.append({**excerpt.model_dump(), 'source_url':url, 'quote_verified':True,
+                '_claim_id':claim['claim_id'],
                 'publication_verified':True, 'score_eligible':False, 'kind':'official_statement'})
         found = {e['topic'] for e in accepted}
         items.append({'area_code':item.area_code,'area_name':target['area_name'],'requested_topics':target['topics'],
             'unconfirmed_topics':[k for k in target['topics'] if k not in found], 'excerpts':accepted,
             'rejection_reasons':reasons, 'status':'found' if accepted else 'unverified' if reasons else 'not_found'})
+    decisions,validation=verify_claims(runner,claims,cancel)
+    for item in items:
+        accepted=[]
+        for excerpt in item['excerpts']:
+            d=decisions[excerpt.pop('_claim_id')]
+            if accepted_decision(d):accepted.append({**excerpt,**verification_fields(d)})
+            else:item['rejection_reasons'][d['reason']]=item['rejection_reasons'].get(d['reason'],0)+1
+        item['excerpts']=accepted;found={e['topic'] for e in accepted}
+        item['unconfirmed_topics']=[k for k in item['requested_topics'] if k not in found]
+        item['status']='found' if accepted else 'unverified' if item['rejection_reasons'] else 'not_found'
     if cancel.is_set(): raise RunnerError('cancelled')
     return {'items':items, 'checked_at':datetime.now(timezone.utc).isoformat(), 'score_eligible':False,
+        'response_validation':validation,
         'policy':{'max_age_days':MAX_AGE_DAYS, 'source_scope':DOMAINS, 'max_areas':3,
                   'numeric_scores':'unchanged', 'absence_of_report':'unknown'}}

@@ -13,6 +13,7 @@ from pydantic import Field, model_validator
 from .codex_runner import RunnerError
 from .contracts import Contract
 from .research_policy import SourcePage, admissible, publication_dates, prompt_rules, MAX_AGE_DAYS
+from .response_validation import make_claim, verify_claims, accepted_decision, verification_fields
 
 DOMAINS = ["tistory.com"]
 USER_AGENT = "SaljariReviewCheck/0.1"
@@ -174,7 +175,7 @@ topic은 course/teaching/size/experience 등이다. 없는 정보를 채우지 �
     if len(answer.items) != len(shops) or {i.facility_id for i in answer.items} != set(expected):
         raise RunnerError("invalid_response")
     checked = datetime.now(timezone.utc).isoformat()
-    pages, used_words, items = {}, {}, []
+    pages, used_words, items, claims = {}, {}, [], []
     for item in answer.items:
         accepted, rejected, reasons = [], 0, {}
         for excerpt in item.excerpts:
@@ -197,14 +198,31 @@ topic은 course/teaching/size/experience 등이다. 없는 정보를 채우지 �
                 reasons[reason] = reasons.get(reason, 0) + 1
                 continue
             used_words[url] = used_words.get(url, 0) + words
+            target=expected[item.facility_id]
+            claim=make_claim('education' if target['kind'] in ('academy','school') else 'living',
+                {k:target[k] for k in ('id','name','address','kind')},excerpt.model_dump(),pages[url],
+                [q for q in questions or [] if item.facility_id in q['facility_ids']])
+            claims.append(claim)
             accepted.append({**excerpt.model_dump(), "source_url": url, "quote_verified": True,
+                             '_claim_id':claim['claim_id'],
                              "identity_verification": "name_and_public_address_in_page",
                              "publication_verified": True, "score_eligible": False})
         items.append({"facility_id": item.facility_id, "excerpts": accepted, "rejected_count": rejected,
                       "rejection_reasons": reasons,
                       "status": "found" if accepted else "unverified" if rejected else "not_found"})
+    decisions,validation=verify_claims(runner,claims,cancel)
+    for item in items:
+        accepted=[]
+        for excerpt in item['excerpts']:
+            d=decisions[excerpt.pop('_claim_id')]
+            if accepted_decision(d):accepted.append({**excerpt,**verification_fields(d)})
+            else:
+                item['rejected_count']+=1;item['rejection_reasons'][d['reason']]=item['rejection_reasons'].get(d['reason'],0)+1
+        item['excerpts']=accepted
+        item['status']='found' if accepted else 'unverified' if item['rejected_count'] else 'not_found'
     if cancel.is_set():
         raise RunnerError("cancelled")
     return {"items": items, "checked_at": checked, "score_eligible": False,
+            'response_validation':validation,
             "policy": {"max_age_days": MAX_AGE_DAYS, "unknown_publication_date": "reject",
                        "source_scope": DOMAINS, "numeric_scores": "unchanged"}}
