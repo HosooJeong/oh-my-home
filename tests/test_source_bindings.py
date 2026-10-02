@@ -1,6 +1,6 @@
 import unittest
 from app.contracts import InterviewTurn, output_schema
-from app.intake import IntakeDraft, prepare_profile
+from app.intake import IntakeDraft, prepare_profile, source_segments
 from app.codex_runner import CodexRunner, RunnerError
 from app.modules.living import LivingModule
 from app.orchestrator import Orchestrator
@@ -65,6 +65,27 @@ class SourceBindingTests(unittest.TestCase):
         p=prepare_profile(FakeRunner(IntakeDraft.model_validate(d)),request)
         self.assertTrue(p.questions[0].blocking)
         self.assertIn('가족 모임',p.questions[0].text)
+
+    def test_repeated_housing_reference_instruction_preserves_both_sources(self):
+        request=('아파트 전세 실거래가를 참고하고 싶어요. '
+                 '집·비용은 실거래 참고만 필요하고 가격 점수/실제 매물 추천은 제외해 줘.')
+        response=draft(groups=[dict(id='housing',weight=0.0,source='user')],criteria=[],
+            context=[dict(key='housing_reference',value='requested',source_id='s1')],
+            needs=[row('s1','context',ids=(),group='housing',keys=('housing_reference',),handling='reference'),
+                   row('s2','context',ids=(),group='housing',keys=('housing_reference',),handling='reference')])
+        p=prepare_profile(FakeRunner(response),request)
+        self.assertFalse(p.questions)
+        self.assertEqual(p.context[0].source_quotes,list(source_segments([request]).values()))
+
+    def test_unrelated_context_cannot_use_housing_reference_exception(self):
+        request='아파트 전세 실거래가를 참고하고 싶어요. 산책 공원도 필요해요.'
+        response=draft(groups=[dict(id='housing',weight=0.0,source='user')],criteria=[],
+            context=[dict(key='housing_reference',value='requested',source_id='s1')],
+            needs=[row('s1','context',ids=(),group='housing',keys=('housing_reference',),handling='reference'),
+                   row('s2','context',ids=(),group='housing',keys=('housing_reference',),handling='background')])
+        p=prepare_profile(FakeRunner(response),request)
+        self.assertTrue(p.questions)
+        self.assertIn('산책 공원',p.questions[0].text)
 
     def test_a_bare_distance_does_not_cross_a_category_heading(self):
         request='마트가 가까운 곳이 좋아. 교육·육아: 중요도 60, 상대 비중 50%. 직선거리 500m 이내가 좋고 2000m 이상은 불편해.'

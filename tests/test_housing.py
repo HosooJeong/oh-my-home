@@ -106,6 +106,29 @@ class HousingTests(unittest.TestCase):
         with self.assertRaises(InterruptedError):
             self.module().run_reference(p, candidates(), cancel)
 
+    def test_city_and_explicit_dong_reference_are_one_nested_scope(self):
+        p=profile()
+        p.context.extend([ContextFact(key='housing_location',value='진주',source_quote='진주에서 비교해요.'),
+            ContextFact(key='housing_location',value='가상동',source_quote='가상동 전세 참고'),
+            ContextFact(key='housing_legal_area',value='가상동',source_quote='가상동 전세 참고'),
+            ContextFact(key='housing_tenure',value='jeonse',source_quote='가상동 전세 참고')])
+        before=p.model_dump()
+        result=self.module().run_reference(p,candidates(),Event())
+        self.assertEqual(result.status,'available')
+        self.assertEqual(result.sample_count,5)
+        self.assertIn('가상동',result.scope)
+        self.assertIn('전세',result.scope)
+        self.assertEqual(p.model_dump(),before)
+
+    def test_different_dong_requests_still_require_scope_review(self):
+        p=profile()
+        p.context.extend([ContextFact(key='housing_location',value='다른동',source_quote='다른동도 참고'),
+            ContextFact(key='housing_location',value='가상동',source_quote='가상동 전세 참고'),
+            ContextFact(key='housing_legal_area',value='가상동',source_quote='가상동 전세 참고')])
+        result=self.module().run_reference(p,candidates(),Event())
+        self.assertEqual(result.status,'unsupported')
+        self.assertEqual(result.sample_count,0)
+
     def test_tampered_index_wrong_city_date_amount_and_tenure_rejected(self):
         for mutate in [lambda d: d.update(city_code="38030"),
                 lambda d: d["records"][0].update(contract_date="2025-01-01"),

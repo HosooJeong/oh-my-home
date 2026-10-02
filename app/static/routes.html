@@ -11,6 +11,7 @@
     <button id="start" type="button" aria-pressed="true"><span>출발지</span><small id="start-label">지도에서 선택하세요</small></button>
     <button id="end" type="button" aria-pressed="false"><span>도착지</span><small id="end-label">지도에서 선택하세요</small></button>
   </div>
+  <form id="address-form" aria-label="경로 주소 검색"><label for="route-address">주소 검색</label><div class="address-search"><input id="route-address" name="address" type="search" placeholder="도로명 주소" required autocomplete="off"><button id="address-query" type="submit">검색</button></div><div id="address-results" aria-label="주소 검색 결과"></div></form>
   <button id="example" class="secondary" type="button">시청 → 진주역 예시</button>
   <label id="walk-options">도보 경로<select id="walk-option"><option value="BROAD_FIRST">넓은 길 우선</option><option value="SHORTEST">최단 경로</option><option value="ACCESSIBLE">편안한 길</option></select></label>
   <button id="query" class="primary" type="button" disabled>경로 조회</button>

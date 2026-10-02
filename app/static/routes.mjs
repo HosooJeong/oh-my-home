@@ -1,6 +1,6 @@
 import {loadKakaoMaps} from './kakao-map.mjs';
 const $=id=>document.getElementById(id);
-let map,maps,token,start,end,mode='walk',target='start',busy=false,version=0;
+let map,maps,token,start,end,mode='walk',target='start',busy=false,locating=false,version=0;
 let drawings=[];
 const status=text=>{$('route-status').textContent=text;};
 function clearResult(){version++;drawings.forEach(item=>item.setMap(null));drawings=[];$('route-results').replaceChildren();$('route-note').hidden=true;drawPoints();}
@@ -9,12 +9,23 @@ function controls(){
  $('start-label').textContent=start?.label||'지도에서 선택하세요';$('end-label').textContent=end?.label||'지도에서 선택하세요';
  for(const id of ['start','end'])$(id).setAttribute('aria-pressed',String(target===id));
  document.querySelectorAll('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mode===mode)));
- $('walk-options').hidden=mode!=='walk';$('query').disabled=busy||!token||!start||!end||!map;
- for(const id of ['start','end','example','walk-option'])$(id).disabled=busy||!map;
- document.querySelectorAll('[data-mode]').forEach(button=>button.disabled=busy);
+ $('walk-options').hidden=mode!=='walk';$('query').disabled=busy||locating||!token||!start||!end||!map;
+ for(const id of ['start','end','example','walk-option','route-address','address-query'])$(id).disabled=busy||locating||!map;
+ document.querySelectorAll('[data-mode]').forEach(button=>button.disabled=busy||locating);
  $('query').textContent=busy?'경로 조회 중':'경로 조회';
 }
-function setPoint(id,point){if(busy)return;if(id==='start')start=point;else end=point;target=id==='start'?'end':'start';clearResult();controls();status('');}
+function setPoint(id,point){if(busy||locating)return;if(id==='start')start=point;else end=point;target=id==='start'?'end':'start';clearResult();controls();status('');}
+// Address search stays in the map SDK. Only the chosen coordinates reach the route API.
+$('address-form').addEventListener('submit',async event=>{
+ event.preventDefault();if(busy||locating||!map)return;const query=$('route-address').value.trim();if(!query)return;
+ const selectedTarget=target;locating=true;controls();$('address-results').replaceChildren();status('주소 검색 중');
+ try{
+  const geocoder=new maps.services.Geocoder();
+  const rows=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('timeout')),10000);geocoder.addressSearch(query,(items,state)=>{clearTimeout(timer);if(state===maps.services.Status.OK)resolve(items);else reject(new Error('address'));});});
+  status('');for(const row of rows.slice(0,6)){const label=row.road_address?.address_name||row.address?.address_name;if(!label||!Number.isFinite(Number(row.x))||!Number.isFinite(Number(row.y)))continue;const button=document.createElement('button');button.type='button';button.textContent=label;button.addEventListener('click',()=>{if(busy||locating)return;setPoint(selectedTarget,{latitude:Number(row.y),longitude:Number(row.x),label});$('address-results').replaceChildren();$('route-address').value='';if(start&&end)fit();else map.setCenter(new maps.LatLng(Number(row.y),Number(row.x)));});$('address-results').append(button);}
+  if(!$('address-results').childElementCount)status('주소를 찾지 못했어요. 도로명 주소를 확인해 주세요.');
+ }catch{status('주소를 찾지 못했어요. 다시 검색해 주세요.');}finally{locating=false;controls();}
+});
 function fit(){if(!map||!start||!end)return;const bounds=new maps.LatLngBounds();for(const p of [start,end])bounds.extend(new maps.LatLng(p.latitude,p.longitude));map.setBounds(bounds,40,40,40,40);}
 function paint(route){
  drawings.forEach(item=>item.setMap(null));drawings=[];drawPoints();const bounds=new maps.LatLngBounds();
@@ -26,7 +37,7 @@ function results(result){
  $('route-note').textContent=result.notice;$('route-note').hidden=false;paint(result.routes[0]);
 }
 async function initMap(){try{maps=await loadKakaoMaps();map=new maps.Map($('route-map'),{center:new maps.LatLng(35.18,128.11),level:6});maps.event.addListener(map,'click',event=>{if(busy)return;const p=event.latLng;setPoint(target,{latitude:p.getLat(),longitude:p.getLng(),label:`${p.getLat().toFixed(5)}, ${p.getLng().toFixed(5)}`});});new ResizeObserver(()=>{if(map){const center=map.getCenter();map.relayout();map.setCenter(center);}}).observe($('route-map'));$('map-retry').hidden=true;controls();}catch{status('지도를 불러오지 못했어요. 다시 시도해 주세요.');$('map-retry').hidden=false;}}
-for(const id of ['start','end'])$(id).addEventListener('click',()=>{target=id;controls();});
+for(const id of ['start','end'])$(id).addEventListener('click',()=>{target=id;$('address-results').replaceChildren();controls();});
 document.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>{mode=button.dataset.mode;clearResult();controls();status('');}));
 $('walk-option').addEventListener('change',()=>{clearResult();status('');});
 $('map-retry').addEventListener('click',initMap);

@@ -9,9 +9,17 @@ FIELDS={'housing_tenure':'tenure','housing_legal_area':'legal_area',
 def housing_scope(profile, legal_areas, available):
     from .modules.housing import HousingQuery
     facts={};errors=[]
+    area_values={f.value for f in profile.context if f.key=='housing_legal_area'}
+    cities={'진주','진주시','경남진주','경남진주시','경상남도진주','경상남도진주시'}
+    area=next(iter(area_values)) if len(area_values)==1 else None
+    # The prepared dataset is Jinju-only. City + its explicit dong is a nested scope,
+    # while different dong requests must still be reviewed rather than widened.
+    nested_locations=bool(area and area in legal_areas and all(
+        re.sub(r'\s+','',f.value) in cities|{area}|{city+area for city in cities}
+        for f in profile.context if f.key=='housing_location'))
     for fact in profile.context:
         if not fact.key.startswith('housing_'):continue
-        if fact.key in facts and facts[fact.key].value!=fact.value:
+        if fact.key in facts and facts[fact.key].value!=fact.value and not (fact.key=='housing_location' and nested_locations):
             errors.append('서로 다른 가격 조회 조건이 있어요. 한 조회 범위를 정해 주세요.')
         facts[fact.key]=fact
     values={}

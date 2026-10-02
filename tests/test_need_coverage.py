@@ -161,6 +161,22 @@ class NeedCoverageTests(unittest.TestCase):
             else:
                 with self.assertRaisesRegex(RunnerError,'unconfirmed_need_exclusion'):prepare_profile(runner,request)
 
+    def test_optional_score_exclusion_keeps_the_original_context_without_failing(self):
+        request='마트의 직선거리 0m가 이상적이고 1500m면 만족도 0이야. 집값은 순위 점수에 반영하지 않아도 괜찮아요.'
+        response=draft(groups=[dict(id='living',weight=100.0,source='user'),dict(id='housing',weight=0.0,source='user')],
+            context=[dict(key='housing_price_scoring',value='excluded',source_id='s2')],
+            needs=[need(),need('housing','excluded',ids=(),source='s2',group='housing',keys=('housing_price_scoring',),resolution='s2')|{'field':'context'}])
+        p=prepare_profile(FakeRunner(response),request)
+        self.assertEqual(p.request,request)
+        self.assertEqual(p.context[0].source_quote,request.split('. ',1)[1])
+        self.assertFalse(any('housing' in q.criterion_ids for q in p.questions))
+
+    def test_score_exclusion_cannot_drop_a_still_weighted_condition(self):
+        request='마트의 직선거리 0m가 이상적이고 1500m면 만족도 0이야, 점수에 반영하지 않아도 괜찮아요.'
+        response=draft(needs=[need(handling='excluded')])
+        with self.assertRaisesRegex(RunnerError,'unconfirmed_need_exclusion'):
+            prepare_profile(FakeRunner(response),request)
+
     def test_interview_resolution_keeps_ids_and_does_not_repeat_answered_questions(self):
         request='마트의 직선거리 0m가 이상적이고 1500m면 만족도 0이야.'
         p=prepare_profile(FakeRunner(draft(needs=[])),request)

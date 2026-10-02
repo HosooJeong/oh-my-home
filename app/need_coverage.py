@@ -39,7 +39,7 @@ LABELS={'facility_fit':'시설의 실제 이용 조건','walking_route':'실제 
         'straight_distance':'직선거리 조건','facility_count':'시설 선택지 조건'}
 PREFERENCE=re.compile(r'원해|원하|싶|필요|중요|좋겠|필수|반드시|이내|이하|넘지|해야|되어야|돼야')
 MANDATORY=re.compile(r'필수(?:조건|야|다|입니다|[.!?\s]*(?:$|[,，;]))|반드시|무조건|꼭\s*필요|(?:가능|있|없|충족|넘지\s*않)[^.!?]{0,12}해야')
-EXCLUSION=re.compile(r'제외|필요\s*없|원하지\s*않|상관\s*없|(?:중요도|비중)\s*0(?:\D|$)')
+EXCLUSION=re.compile(r'제외|필요\s*없|원하지\s*않|상관\s*없|(?:중요도|비중)\s*0(?:\D|$)|(?:점수|순위|비중)[^.!?\n]{0,16}반영하지\s*않(?:아도|아요|습니다)')
 # These are bounded checks for the review's concrete failure cases, not a general language classifier.
 CRITICAL_FACETS={
     'facility_fit':re.compile(r'큰\s*마트|대형\s*마트|대량|품목|알레르기|신선|소수\s*정예|소그룹|반\s*크기|휠체어|기구|자유\s*이용|레슨'),

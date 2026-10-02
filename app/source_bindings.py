@@ -168,6 +168,16 @@ def bind_fields(doc, sources, needs, previous=None, answers=()):
             facts = [c for c in doc['context'] if c['key'] == key]
             linked = any(c['source_quote'] in t or t in c['source_quote'] or t in c['source_quotes']
                          for c in facts for t in texts)
+            if not linked and n.field == 'context':
+                # Repeated explicit housing instructions can share one context value.
+                # Keep both original quotes; never use this for criteria or arbitrary context keys.
+                intent = {
+                    ('housing_reference', 'requested'): r'실거래[^.!?\n]{0,30}참고',
+                    ('housing_price_scoring', 'excluded'): r'(?:집값|가격)[^.!?\n]{0,30}(?:점수|순위)[^.!?\n]{0,30}(?:제외|반영하지\s*않)',
+                }
+                linked = any((pattern := intent.get((key, c['value'])))
+                             and re.search(pattern, c['source_quote'])
+                             and any(re.search(pattern, t) for t in texts) for c in facts)
             if not linked:
                 # Shared research flags can have separate requests concerning the same facility type.
                 linked = n.field == 'context' and any(
