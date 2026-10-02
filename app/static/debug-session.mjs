@@ -6,7 +6,7 @@ export function getSession(){
   let token;try{const saved=JSON.parse(sessionStorage.getItem(KEY));if(Date.now()-saved.at<3500000)token=saved.token;}catch{}
   let response=await fetch('/api/bootstrap',{headers:token?{'X-Session':token}:{}});
   if(response.status===403)response=await fetch('/api/bootstrap');
-  if(!response.ok)throw new Error('서버 연결을 확인해 줘.');
+  if(!response.ok)throw new Error('서버 연결을 확인해 주세요.');
   const data=await response.json();try{sessionStorage.setItem(KEY,JSON.stringify({token:data.token,at:Date.now()}));}catch{}
   return data;
  })().catch(error=>{pending=null;throw error;});return pending;

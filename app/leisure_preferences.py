@@ -86,7 +86,7 @@ def leisure_profile(data):
                 if edited(data,importance_field): values.update(importance=importance,importance_source='user')
                 if number<3 and distance_changed:
                     if criterion['utility'] and (criterion['utility']['unit']!='m' or criterion['utility']['direction']!='lower'):
-                        raise PreservationError('기존 여가 이동 기준은 직선거리와 달라. 원래 조건을 유지했어.')
+                        raise PreservationError('기존 여가 이동 기준은 직선거리와 달라요. 원래 조건을 유지했어요.')
                     values['utility']=utility
                 values['parameters']=dict(criterion['parameters'])
                 values['parameters'].update({k:v for k,v in parameters.items() if edited(data,k)})

@@ -103,7 +103,7 @@ export function confirmAdditionalGroups(profile,offered,included){
  for(const g of copy.groups.filter(g=>included.includes(g.id))){g.source='user';g.reason='사용자가 추가 요구와 제안 비중을 확인했어.';}
  const names=profile.groups.filter(g=>offered.includes(g.id)).map(g=>`${g.label}: ${excluded.has(g.id)?'이번 분석에서 제외':'추가 요구와 표시한 비중 포함'}`).join(', ');
  const request=copy.request+'\n추가 조건 확인: '+names+'.';
- if(request.length>4000)throw new TypeError('조건 기록이 길어졌어. 원래 내용을 유지했으니 조건 수정에서 정리해 줘.');
+ if(request.length>4000)throw new TypeError('조건 기록이 길어졌어요. 원래 내용을 유지했으니 조건 수정에서 정리해 주세요.');
  copy.request=request;copy.revision++;
  return copy;
 }

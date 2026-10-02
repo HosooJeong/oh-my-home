@@ -59,7 +59,7 @@ function renderSafety() {
       $('safety-research-result').append(box);
     }
     $('safety-status').textContent=`지역 보완 조사 완료 · ${new Date(research.checked_at).toLocaleString('ko-KR')}. 찾지 못한 자료는 미확인이며, 안전·위험 판정이나 점수에 반영하지 않았어요.`;
-  } else if (reviewState.result?.errors?.some(e=>e.module==='safety')) $('safety-status').textContent='지역 보완 조사를 완료하지 못했어요. 문제별 근거는 미확인으로 남겼어.';
+  } else if (reviewState.result?.errors?.some(e=>e.module==='safety')) $('safety-status').textContent='지역 보완 조사를 완료하지 못했어요. 문제별 근거는 미확인으로 남겼어요.';
   else if (state.run.safety_research_status) $('safety-status').textContent='조사할 문제나 공식 행정동 범위를 확인할 수 없어 보완을 실행하지 않았어요.';
   else if (state.run.research_status==='busy') $('safety-status').textContent='다른 AI 작업 때문에 보완을 시작하지 못했어요. 작업 종료 후 비교를 새로 실행해 주세요.';
   else if ((state.run.safety_research_scope || []).length) $('safety-status').textContent='최신 공식 지역자료를 조사하고 있어요.';

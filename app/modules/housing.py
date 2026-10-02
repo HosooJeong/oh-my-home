@@ -11,12 +11,12 @@ from ..contracts import CategoryResult, Contract, ReferenceDistribution, Referen
 SOURCE = "https://rt.molit.go.kr/pt/xls/xls.do?mobileAt="
 VERSION = "jinju_apartment_transactions_v1"
 LIMITATIONS = [
-    "과거 신고 거래의 참고 분포야. 현재 매물·호가·개별 집의 가격·예산 충족 여부를 뜻하지 않아.",
-    "가격은 점수·필수조건 판정·분석 지점 선별에 반영하지 않아. 같은 지역에서도 집마다 차이가 커.",
-    "법정동 주소로 조회해. 지도 분석의 센서스 행정동과 연결하지 않았고, 후보별 가격을 추정하지 않아.",
-    "계약일 기준이며 신고·정정·해제로 바뀔 수 있어. 공식 통계가 아니며 외부 통계 공개에는 신고일 기준 공식통계를 사용해야 해.",
-    "아파트만 포함해. 면적·연식·층·단지·신규/갱신·공공임대 차이가 섞여 있고, 작은 표본은 대표성이 낮아.",
-    "월세 보증금과 월세금은 같은 표본의 별도 분포야. 두 중앙값이 실제 한 계약의 조합인 것은 아니야.",
+    "과거 신고 거래의 참고 분포예요. 현재 매물·호가·개별 집의 가격·예산 충족 여부를 뜻하지 않아요.",
+    "가격은 점수·필수조건 판정·분석 지점 선별에 반영하지 않아요. 같은 지역에서도 집마다 차이가 커요.",
+    "법정동 주소로 조회해요. 지도 분석의 센서스 행정동과 연결하지 않았고, 후보별 가격을 추정하지 않아요.",
+    "계약일 기준이며 신고·정정·해제로 바뀔 수 있어요. 공식 통계가 아니며 외부 통계 공개에는 신고일 기준 공식통계를 사용해야 해요.",
+    "아파트만 포함해요. 면적·연식·층·단지·신규/갱신·공공임대 차이가 섞여 있고, 작은 표본은 대표성이 낮아요.",
+    "월세 보증금과 월세금은 같은 표본의 별도 분포예요. 두 중앙값이 실제 한 계약의 조합인 것은 아니에요.",
 ]
 
 
@@ -159,7 +159,7 @@ class HousingModule:
         return ReferenceResult(module_id=self.id,module_version=self.version,
             profile_fingerprint=profile.fingerprint(),candidates_fingerprint=digest([c.model_dump() for c in candidates]),
             status='unsupported',query_fingerprint=digest({'query':query.model_dump() if query else None,'errors':errors}),
-            scope='요청한 실거래 조회 범위를 확인해야 해.',sample_count=0,distributions=[],
+            scope='요청한 실거래 조회 범위를 확인해야 해요.',sample_count=0,distributions=[],
             contract_counts={'new':0,'renewal':0,'unknown':0},source_url=SOURCE,
             period_start=d.get('period_start'),period_end=d.get('period_end'),retrieved_at=d.get('retrieved_at'),
             snapshot_fingerprint=digest(d) if d else None,limitations=LIMITATIONS,unhandled_filters=errors,

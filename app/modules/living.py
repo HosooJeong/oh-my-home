@@ -39,11 +39,11 @@ class ShopIndex:
             self.records[row["id"]] = row
             compact_name = re.sub(r"\s+", "", row["name"])
             if row['detail'] in ('슈퍼마켓','편의점') and CLOTHING_BRAND.match(compact_name):
-                self.conflicts[row['id']]='의류 브랜드 상호와 장보기 업종의 충돌이 의심돼. 동일 시설 대조 전에는 장보기 근거로 확정하지 않아.'
+                self.conflicts[row['id']]='의류 브랜드 상호와 장보기 업종의 충돌이 의심돼요. 동일 시설 대조 전에는 장보기 근거로 확정하지 않아요.'
             if row["detail"] in ("슈퍼마켓", "편의점") and "전자담배" in compact_name:
-                self.conflicts[row["id"]] = "상호에 전자담배가 포함돼 업종 분류와 충돌이 의심돼. 장보기 시설인지 확인이 필요해."
+                self.conflicts[row["id"]] = "상호에 전자담배가 포함돼 업종 분류와 충돌이 의심돼요. 장보기 시설인지 확인이 필요해요."
             if row["detail"] == "편의점" and SUPERMARKET_BRAND.match(compact_name):
-                self.conflicts[row["id"]] = "편의점 업종이지만 슈퍼마켓 브랜드 상호여서 분류 확인이 필요해."
+                self.conflicts[row["id"]] = "편의점 업종이지만 슈퍼마켓 브랜드 상호여서 분류 확인이 필요해요."
             if row["detail"] == "편의점":
                 self.groups["convenience"].append(row)
             elif row["detail"] == "슈퍼마켓":
@@ -73,7 +73,7 @@ class ShopIndex:
                 "generated_at": self.generated_at,
                 "source_url": SOURCE, "data_dates": sorted({r["date"] for r in self.records.values()}),
                 "filter": "슈퍼마켓 업종 중 편의점 브랜드 접두어를 제외. 편의점은 원본 편의점 업종만 사용.",
-                "limitations": "진주 자료에 등록된 시설의 직선거리야. 도보 경로·재고·현재 영업·휴폐업은 확인되지 않았어."}
+                "limitations": "진주 자료에 등록된 시설의 직선거리예요. 도보 경로·재고·현재 영업·휴폐업은 확인되지 않았어요."}
 
 
 class LivingModule:
@@ -100,7 +100,7 @@ class LivingModule:
                 conflict = self.index.conflicts.get(row["id"]) if row else None
                 note = (f"{row['name']} · 원본 업종 {row['detail']} · 원본 {row['source_member']} {row['source_row']}행. "
                         "진주 자료에 등록된 시설 중 최단 직선거리. 도보 거리·재고·현재 영업은 미확인."
-                        if row else "지원 좌표 범위 밖이거나 해당 업종 자료가 없어 거리를 확인할 수 없어.")
+                        if row else "지원 좌표 범위 밖이거나 해당 업종 자료가 없어 거리를 확인할 수 없어요.")
                 if conflict:
                     note = conflict + " " + note
                 evidence.append(Evidence(id="living_" + digest([candidate.id, criterion.id])[:24],

@@ -39,7 +39,7 @@ class StopIndex:
         return {"stop_count": len(self.records), "source_url": SOURCE,
                 "data_dates": sorted({r["date"] for r in self.records.values()}),
                 "generated_at": self.generated_at,
-                "limitations": "등록된 정류장까지 직선거리야. 도보 경로·노선·방향·배차·현재 운행은 미확인이야."}
+                "limitations": "등록된 정류장까지 직선거리예요. 도보 경로·노선·방향·배차·현재 운행은 미확인이에요."}
 
 
 class TransportModule:
@@ -64,7 +64,7 @@ class TransportModule:
                 note = (f"{row['name']} · 정류장번호 {row['source_id']} · 원본 CSV {row['source_row']}행. "
                         "진주 자료에 등록된 정류장 중 최단 직선거리. 정류장 주소 컬럼 없음. "
                         "도보 경로·횡단 가능 여부·탑승 방향·노선·배차·현재 운행은 미확인."
-                        if row else "지원 좌표 범위 밖이거나 정류장 자료가 없어 거리를 확인할 수 없어.")
+                        if row else "지원 좌표 범위 밖이거나 정류장 자료가 없어 거리를 확인할 수 없어요.")
                 evidence.append(Evidence(id="transport_" + digest([candidate.id, criterion.id])[:24],
                     candidate_id=candidate.id, criterion_id=criterion.id,
                     value=round(value, 3) if value is not None else None, unit="m",

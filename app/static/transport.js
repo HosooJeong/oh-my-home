@@ -68,7 +68,7 @@ $('transport-form').addEventListener('submit', async event => {
       edited_fields:editedFields('transport-form'),
     });
     setProfile(result.profile);
-    notice('교통 조건을 반영했어요. 같은 후보로 다시 비교하면 새 조건을 적용해.');
+    notice('교통 조건을 반영했어요. 같은 후보로 다시 비교하면 새 조건을 적용해요.');
   } catch(error) { notice(error.message, true); }
   finally { busy(false); }
 });

@@ -104,19 +104,19 @@ def quick_profile(data: QuickInput):
         if field=='supermarket_weight': metrics.add('house_to_grocery_straight_line_distance_m')
         old=[c for c in doc['criteria'] if c['module_id']=='living' and c['metric'] in metrics]
         if len(old)>1 or old and old[0]['group_id']!='living':
-            raise PreservationError('여러 장보기 조건이 있어. 이 입력란으로 합치지 않고 원래 조건을 유지했어.')
+            raise PreservationError('여러 장보기 조건이 있어요. 이 입력란으로 합치지 않고 원래 조건을 유지했어요.')
         if not old:
             while any(c['id']==template['id'] for c in doc['criteria']): template['id']+='_x'
             template['source_quote']=quote;doc['criteria'].append(template);continue
         c=old[0];values={}
         if edited(data,'ideal','limit'):
             if c['utility'] and (c['utility']['unit']!='m' or c['utility']['direction']!='lower'):
-                raise PreservationError('기존 장보기 기준은 직선거리와 달라. 원래 조건을 유지했어.')
+                raise PreservationError('기존 장보기 기준은 직선거리와 달라요. 원래 조건을 유지했어요.')
             values['utility']=template['utility']
         if edited(data,field): values.update(importance=template['importance'],importance_source='user')
         if edited(data,'mandatory_limit'):
             if c['hard'] and c['hard']['operator']!='lte' and data.mandatory_limit:
-                raise PreservationError('기존 장보기 필수조건은 이 입력란으로 표현할 수 없어. 원래 조건을 유지했어.')
+                raise PreservationError('기존 장보기 필수조건은 이 입력란으로 표현할 수 없어요. 원래 조건을 유지했어요.')
             values['hard']=(c['hard'] or template['hard']) if data.mandatory_limit else None
         preserve_need(c,values,quote)
     if not any(g['id']=='living' for g in doc['groups']):doc['groups'].append(fresh['groups'][0])
@@ -570,7 +570,7 @@ def make_handler(state, env_path):
                     request = GenerationInput.model_validate(data)
                     if not state.candidate_pool:
                         return self.send(200, {"status": "unavailable", "candidates": [],
-                            "reason": "경계와 분석 지점 자료를 준비해야 자동으로 찾을 수 있어. 지도에서 직접 후보를 골라 줘."})
+                            "reason": "경계와 분석 지점 자료를 준비해야 자동으로 찾을 수 있어요. 지도에서 직접 후보를 골라 주세요."})
                     return self.send(200, state.candidate_pool.generate(request, state.orchestrator))
                 if path == "/api/intake":
                     return self.send(202, state.intake(session, IntakeInput.model_validate(data)))

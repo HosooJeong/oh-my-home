@@ -11,7 +11,7 @@ function updateEducationControls() { $('education-fields').disabled = state.busy
 function initEducation(data) {
   $('education-data-note').textContent = data.available
     ? `진주 학교 ${data.counts.school}곳 · 학원 ${data.counts.academy}개소. 학원 위치 미연결 ${data.academy_unlocated}개소, 연계일이 오래됐거나 미래인 자료 ${data.academy_old_or_future}개소. 위치·학령·자료 시점이 빠진 경우 전체 개소와 점수는 미확인이에요.`
-    : '교육 자료가 준비되지 않았어요. 조건은 보존하고 결과는 미확인으로 남겨.';
+    : '교육 자료가 준비되지 않았어요. 조건은 보존하고 결과는 미확인으로 남겨요.';
 }
 function renderEducationProfile() {
   resetEdits('education-form');

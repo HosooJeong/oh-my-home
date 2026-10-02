@@ -164,13 +164,13 @@ def research_leisure(runner,scope,*,cancel,index,fetcher=fetch_page):
             'registered_id':matches[0]['id'] if len(matches)==1 else None,
             'coordinates_confirmed':False,'score_eligible':False,
             'excerpts':[dict(quote=item.quote,interpretation=item.interpretation,title=item.title,published_date=item.published_date)] if dated else [],
-            'note':'원문·지점·주소·종목을 대조한 보완 자료이며 현재 이용/필수조건 충족은 미확인이야.' if dated else
-                   '원문의 지점·주소를 대조한 발견 후보야. 작성일이 없어 최신 이용 형태/경험 근거로 채택하지 않았어.'}
+            'note':'원문·지점·주소·종목을 대조한 보완 자료이며 현재 이용/필수조건 충족은 미확인이에요.' if dated else
+                   '원문의 지점·주소를 대조한 발견 후보예요. 작성일이 없어 최신 이용 형태/경험 근거로 채택하지 않았어요.'}
         if dated:
             forms=request.get('forms',[]) if request else scope.get('forms',{}).get(item.activity,[])
             form_error=form_reason(forms,item.quote)
             if form_error:
-                found[key].update(status='request_unverified',excerpts=[],note='시설·주소·종목은 대조했지만 요청한 이용 형태는 미확인이야.')
+                found[key].update(status='request_unverified',excerpts=[],note='시설·주소·종목은 대조했지만 요청한 이용 형태는 미확인이에요.')
                 rejected+=1;reasons[form_error]=reasons.get(form_error,0)+1
             else:
                 claim=make_claim('leisure',{'name':item.name,'address':item.address,'activity':item.activity,
@@ -184,7 +184,7 @@ def research_leisure(runner,scope,*,cancel,index,fetcher=fetch_page):
         if accepted_decision(decision):
             discovery['excerpts']=[{**x,**verification_fields(decision)} for x in discovery['excerpts']]
         else:
-            discovery.update(status='request_unverified',excerpts=[],note='시설 발견과 요청 조건의 근거를 구분했어. 관련성·AI 해석 검토를 통과하지 못해 조건은 미확인이야.')
+            discovery.update(status='request_unverified',excerpts=[],note='시설 발견과 요청 조건의 근거를 구분했어요. 관련성·AI 해석 검토를 통과하지 못해 조건은 미확인이에요.')
             rejected+=1;reasons[decision['reason']]=reasons.get(decision['reason'],0)+1
     if cancel.is_set(): raise RunnerError('cancelled')
     return {'discoveries':list(found.values()),'rejected_count':rejected,'rejection_reasons':reasons,

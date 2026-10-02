@@ -176,9 +176,9 @@ def review_needs(profile, sources, needs=None, required_ids=(), previous=None, a
         for source in list(dict.fromkeys(missing+list(uncertain))):
             if not any(c['key']=='unresolved_request' and c['source_quote']==sources[source] for c in doc['context']):
                 doc['context'].append(dict(key='unresolved_request',value=sources[source],source_quote=sources[source]))
-        question={'id':'need_coverage_review','text':'이 내용의 대상·거리 기준·비중을 어떻게 적용할까? '+
+        question={'id':'need_coverage_review','text':'이 내용의 대상·거리 기준·비중을 어떻게 적용할까요? '+
                   ' / '.join(sources[s] for s in pending)[:1200],
-                  'reason':'조건의 연결이나 기준을 확인해야 해. 입력한 원문은 그대로 남아 있어.',
+                  'reason':'조건의 연결이나 기준을 확인해야 해요. 입력한 원문은 그대로 남아 있어요.',
                   'criterion_ids':list(dict.fromkeys([r['criterion_id'] for r in repairs if r['source_id'] in pending]+
                       [id for n in needs if n.source_id in pending for id in n.criterion_ids]+
                       [id for ids in uncertain.values() for id in sorted(ids)]+

@@ -69,14 +69,14 @@ def education_profile(data):
             else:
                 school = metric == SCHOOL_METRIC
                 if school and criterion['parameters'].get('school_id') and parameters['school_level'] != criterion['parameters'].get('school_level') and edited(data,'school_level'):
-                    raise PreservationError('지정 학교가 있어. 학교급만 바꾸면서 다른 학교로 바꾸지 않고 원래 조건을 유지했어.')
+                    raise PreservationError('지정 학교가 있어요. 학교급만 바꾸면서 다른 학교로 바꾸지 않고 원래 조건을 유지했어요.')
                 values={}
                 importance_field='school_importance' if school else 'academy_importance'
                 if edited(data,importance_field): values.update(importance=importance,importance_source='user')
                 rule_fields=('school_ideal','school_limit') if school else ('sufficient_count',)
                 if edited(data,*rule_fields):
                     if criterion['utility'] and (criterion['utility']['unit']!=utility['unit'] or criterion['utility']['direction']!=utility['direction']):
-                        raise PreservationError('기존 교육 평가 기준은 이 입력란의 단위·방향과 달라. 원래 조건을 유지했어.')
+                        raise PreservationError('기존 교육 평가 기준은 이 입력란의 단위·방향과 달라요. 원래 조건을 유지했어요.')
                     values['utility']=utility
                 parameter_fields={'school_level':'school_level'} if school else {'school_level':'school_level','subject':'subject','radius_m':'radius_m'}
                 values['parameters']=dict(criterion['parameters'])

@@ -33,7 +33,7 @@ function renderHousingReference(reference) {
     const c = reference.contract_counts;
     target.append(node('p', `신규 ${c.new}건 · 갱신 ${c.renewal}건 · 구분 미확인 ${c.unknown}건`, 'hint'));
   }
-  target.append(node('p', '가운데 50%는 25~75백분위 구간이야. 범위 안에 같은 가격의 집이 지금 있다는 뜻은 아니에요.', 'hint'));
+  target.append(node('p', '가운데 50%는 25~75백분위 구간이에요. 범위 안에 같은 가격의 집이 지금 있다는 뜻은 아니에요.', 'hint'));
 }
 async function queryHousing() {
   if (housingBusy || !housingAvailable) return;

@@ -50,7 +50,7 @@ class EducationIndex:
                 'academy_unlocated': sum(r['kind'] == 'academy' and r['lat'] is None for r in self.records.values()),
                 'academy_old_or_future': sum(r['kind'] == 'academy' and not 0 <= (today()-date.fromisoformat(r['date'])).days <= 365 for r in self.records.values()),
                 'excluded': self.document['excluded'], 'levels': LEVELS, 'subjects': SUBJECTS,
-                'limitations': '학교는 공식 위치, 학원은 같은 도로명주소 상가 좌표를 연결한 건물 수준 위치야. 학교 배정·반 크기·보행 경로는 미확인이야.'}
+                'limitations': '학교는 공식 위치, 학원은 같은 도로명주소 상가 좌표를 연결한 건물 수준 위치예요. 학교 배정·반 크기·보행 경로는 미확인이에요.'}
 
     def select(self, criterion):
         p = criterion.parameters
@@ -99,14 +99,14 @@ class EducationIndex:
         status = 'verified' if available and not uncertain and (ranked or radius is not None) else 'missing'
         if not available:
             value = None; selected = []
-        label = ('학교까지 직선거리. 최근접은 배정을 뜻하지 않아.' if radius is None else
-                 f'{radius:g}m 직선반경 안에 과목·학령·위치를 확인한 학원 {len(ranked)}개소. 과정 수를 중복 집계하지 않았어.')
+        label = ('학교까지 직선거리. 최근접은 배정을 뜻하지 않아요.' if radius is None else
+                 f'{radius:g}m 직선반경 안에 과목·학령·위치를 확인한 학원 {len(ranked)}개소. 과정 수를 중복 집계하지 않았어요.')
         note = label + f' 진주 해당 자료 중 위치/학령/자료 시점 미확인 {len(uncertain)}개소. '
         if radius is not None and uncertain:
-            note += '이 미확인 시설이 반경 안에 포함되는지도 확정할 수 없어. '
+            note += '이 미확인 시설이 반경 안에 포함되는지도 확정할 수 없어요. '
         if uncertain:
-            note += '누락이 있어 전체 최단거리/개소 수와 점수는 확정하지 않았어. '
-        note += '등록정원·일시수용인원은 실제 반 크기가 아니야. 도보 경로·횡단·현재 모집은 미확인.'
+            note += '누락이 있어 전체 최단거리/개소 수와 점수는 확정하지 않았어요. '
+        note += '등록정원·일시수용인원은 실제 반 크기가 아니에요. 도보 경로·횡단·현재 모집은 미확인.'
         return {'value': value, 'status': status, 'note': note, 'selected': [r for _, r in selected],
                 'confirmed_count': len(ranked), 'uncertain_count': len(uncertain)}
 

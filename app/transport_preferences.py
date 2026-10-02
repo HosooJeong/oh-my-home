@@ -38,7 +38,7 @@ def transport_profile(data: TransportInput) -> NeedProfile:
     hard = None
     if data.include_stop and data.mandatory_limit:
         if stop and stop['hard'] and stop['hard']['operator'] != 'lte':
-            raise PreservationError('현재 필수조건은 이 거리 입력란으로 바꿀 수 없어. 원래 조건을 유지했어.')
+            raise PreservationError('현재 필수조건은 이 거리 입력란으로 바꿀 수 없어요. 원래 조건을 유지했어요.')
         value = data.hard_limit if data.hard_limit is not None else stop['hard']['value'] if stop and stop['hard'] else data.limit
         hard = {'operator': 'lte', 'value': value}
     quote = (f"교통 조건 확인: 이동수단 {MODES[data.mode]}, 목적지 {data.destination.strip() or '미정'}, "
@@ -70,7 +70,7 @@ def transport_profile(data: TransportInput) -> NeedProfile:
         values = {}
         if edited(data,'ideal','limit'):
             if stop['utility'] and (stop['utility']['unit'] != 'm' or stop['utility']['direction'] != 'lower'):
-                raise PreservationError('기존 이동 기준은 직선거리와 달라. 원래 조건을 유지했어.')
+                raise PreservationError('기존 이동 기준은 직선거리와 달라요. 원래 조건을 유지했어요.')
             values['utility'] = {'direction':'lower','ideal':data.ideal,'limit':data.limit,'unit':'m'}
         if edited(data,'mandatory_limit','hard_limit'):
             values['hard'] = hard

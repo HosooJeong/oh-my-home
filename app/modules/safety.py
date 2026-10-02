@@ -118,8 +118,8 @@ class SafetyModule:
             radius_m=radius, source_url=SOURCE, publication_date=self.index.publication_date,
             retrieved_at=self.index.document['generated_at'], snapshot_fingerprint=self.index.fingerprint,
             excluded_coordinate_rows=self.index.excluded, observations=observations, limitations=[
-                '공개본 수정일은 촬영·관측일이나 현재 작동 확인일이 아니야. CCTV 작동·방향·사각지대는 미확인.',
-                '같은 좌표의 여러 등록 행을 묶었어. 좌표 지점 수는 카메라 대수나 서로 다른 설치 시설 수가 아니야.',
-                '좌표 오류 분리 행은 어느 후보 반경에 포함되는지 몰라. 등록 자료의 누락도 있을 수 있어.',
-                'CCTV 수·최근접 직선거리는 범죄율·야간 안전·사고·침수·소음·대기환경의 평가 근거로 사용하지 않아.',
-                '직선반경은 실제 이동 경로가 아니야. 웹 조사 결과도 집이나 통학로의 안전을 보장하지 않아.'])
+                '공개본 수정일은 촬영·관측일이나 현재 작동 확인일이 아니에요. CCTV 작동·방향·사각지대는 미확인.',
+                '같은 좌표의 여러 등록 행을 묶었어요. 좌표 지점 수는 카메라 대수나 서로 다른 설치 시설 수가 아니에요.',
+                '좌표 오류 분리 행은 어느 후보 반경에 포함되는지 알 수 없어요. 등록 자료의 누락도 있을 수 있어요.',
+                'CCTV 수·최근접 직선거리는 범죄율·야간 안전·사고·침수·소음·대기환경의 평가 근거로 사용하지 않아요.',
+                '직선반경은 실제 이동 경로가 아니에요. 웹 조사 결과도 집이나 통학로의 안전을 보장하지 않아요.'])

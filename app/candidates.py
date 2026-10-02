@@ -59,13 +59,13 @@ def selection_reason(profile, assessment, evidence, tied):
         value = f"{round(b['value']):,}m·직선거리" if b['unit']=='m' else f"{b['value']:g}개소·등록자료" if b['unit']=='count' else f"{b['value']:g} {b['unit']}"
         return f"{b['label']}({value})"
     labels = ' · '.join(measured_label(b) for b in basis[:2])
-    text = f'{labels}의 확인된 기여를 기준으로 골랐어.'
+    text = f'{labels}의 확인된 기여를 기준으로 골랐어요.'
     if assessment['score_range'][0] == 0:
-        text = f'{labels}을 확인했지만 네 기준에 따른 기여는 0점이야.'
+        text = f'{labels}을 확인했지만 원하는 기준에 따른 기여는 0점이에요.'
     if unknown:
-        text += ' ' + ' · '.join(c['label'] for c in unknown[:2]) + (' 등은' if len(unknown)>2 else '은') + ' 미확인이야.'
+        text += ' ' + ' · '.join(c['label'] for c in unknown[:2]) + (' 등은' if len(unknown)>2 else '은') + ' 미확인이에요.'
     if tied:
-        text += ' 같은 평가값의 지점은 ID 순서와 후보 간격으로 골랐어.'
+        text += ' 같은 평가값의 지점은 ID 순서와 후보 간격으로 골랐어요.'
     return {'text':text, 'basis':basis, 'unverified':unknown,
             'tie_breaker':'candidate_id_then_separation' if tied else None}
 
@@ -113,7 +113,7 @@ class CandidatePool:
                 "areas": [{**a, "point_count": counts[a["code"]],
                            "view_bounds":list(self.boundary.bounds[a['code']])}
                           for a in self.boundary.metadata()["areas"]],
-                "limitations": "상가가 등록된 500m 격자 중심점만 비교해. 조용한 주거지·자연환경을 고르게 대표하지 않으며 실제 주택·매물·거주 가능 여부는 미확인이야."}
+                "limitations": "상가가 등록된 500m 격자 중심점만 비교해요. 조용한 주거지·자연환경을 고르게 대표하지 않으며 실제 주택·매물·거주 가능 여부는 미확인이에요."}
 
     def generate(self, data, orchestrator):
         valid_codes = set(self.boundary.features) - {"38030"}
@@ -124,24 +124,24 @@ class CandidatePool:
                 "profile_fingerprint": data.profile.fingerprint(),
                 "selection_fingerprint": digest(data.model_dump())}
         if any(q.blocking for q in data.profile.questions):
-            return {**base, "status": "needs_input", "reason": "먼저 비교에 필요한 인터뷰 답변을 반영해 줘."}
+            return {**base, "status": "needs_input", "reason": "먼저 비교에 필요한 인터뷰 답변을 반영해 주세요."}
         w = weights(data.profile)
         active = [c for c in data.profile.criteria if w[c.id] > 0 or c.hard]
         plan = execution_plan(data.profile)
         base.update(execution_plan=plan, selection_mode=data.mode)
         unsupported = [p['label'] for p in plan if p['role'] == 'unverified']
         if unsupported and (data.mode == 'strict' or any(p['hard'] and p['role'] == 'unverified' for p in plan)):
-            return {**base, "status": "unsupported", "reason": "자동 선별에 필요한 조건의 근거가 아직 없어: " + ", ".join(unsupported)}
+            return {**base, "status": "unsupported", "reason": "자동 선별에 필요한 조건의 근거가 아직 없어요: " + ", ".join(unsupported)}
         if any(g.weight > 0 and g.source == "proposed" for g in data.profile.groups) or any(
                 w[c.id] > 0 and (c.source == "proposed" or c.importance_source == "proposed") for c in active):
-            return {**base, "status": "needs_input", "reason": "제안된 조건과 중요도를 먼저 확인해 줘."}
+            return {**base, "status": "needs_input", "reason": "제안된 조건과 중요도를 먼저 확인해 주세요."}
         points = [p for p in self.points.values() if not data.area_codes or p["area_code"] in data.area_codes]
         base["searched_count"] = len(points)
         if not points:
-            return {**base, "status": "empty", "reason": "선택한 범위에 준비된 분석 지점이 없어."}
+            return {**base, "status": "empty", "reason": "선택한 범위에 준비된 분석 지점이 없어요."}
         run = orchestrator.run(data.profile, [p["candidate"] for p in points], include_references=False)
         if not run["report"] or any(q["blocking"] for q in run["questions"]):
-            return {**base, "status": "needs_input", "reason": "비교에 필요한 조건을 먼저 확인해 줘."}
+            return {**base, "status": "needs_input", "reason": "비교에 필요한 조건을 먼저 확인해 주세요."}
         assessments = run["report"]["assessments"]
         eligible = [a for a in assessments if a["eligibility"] == "eligible" and has_selection_evidence(a)
                     and (a["score"] is not None or data.mode == 'exploratory')]
@@ -156,7 +156,7 @@ class CandidatePool:
                               'evidence_count':len(m['evidence'])} for m in run['modules']])
         if data.mode=='exploratory' and not eligible and no_evidence_count:
             return {**base, 'status':'needs_scope', 'reason_code':'no_selection_evidence',
-                    'reason':'지금 조건으로 지역을 고를 근거가 없어. 알아볼 지역을 정하고 조사할 지점을 직접 골라줘.',
+                    'reason':'지금 조건으로 지역을 고를 근거가 없어요. 알아볼 지역을 정하고 조사할 지점을 직접 골라 주세요.',
                     'ranking_status':'withheld', 'selected':[], 'next_action':'choose_area_and_point',
                     'unverified_criteria':[p for p in plan if p['role']=='unverified']}
         # Keep original weights and sort the confirmed contribution; unknowns remain unknown.
@@ -182,9 +182,9 @@ class CandidatePool:
         base.update(ranking_status='withheld' if partial else run['report']['ranking_status'],
                     unverified_criteria=[p for p in plan if p['role'] == 'unverified'])
         return {**base, "status": "completed" if len(selected) == data.count else "limited" if selected else "empty",
-                "reason": "전체 근거가 확인되고 필수조건을 통과한 지점에서 적합도 순으로, 지정한 간격을 유지해 골랐어."
-                    if selected and not partial else "확인된 기여가 큰 탐색 지점을 골랐어. 미확인 조건의 비중을 유지하며 전체 순위는 보류해."
-                    if selected else "필수조건 탈락 또는 근거 미확인으로 선별할 지점이 없어. 조건과 자료 범위를 확인해 줘.",
+                "reason": "전체 근거가 확인되고 필수조건을 통과한 지점에서 적합도 순으로, 지정한 간격을 유지해 골랐어요."
+                    if selected and not partial else "확인된 기여가 큰 탐색 지점을 골랐어요. 미확인 조건의 비중을 유지하며 전체 순위는 보류해요."
+                    if selected else "필수조건 탈락 또는 근거 미확인으로 선별할 지점이 없어요. 조건과 자료 범위를 확인해 주세요.",
                 "candidates": [p["candidate"].model_dump() for p in selected],
                 "selected": [{"candidate_id": p["candidate"].id, "score": p["score"],
                               "score_range": p['score_range'], "coverage":p['coverage'],

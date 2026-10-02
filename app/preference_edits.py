@@ -31,7 +31,7 @@ def edited(data, *fields):
     if names is None:
         return True  # Existing API callers explicitly submit a complete form.
     if set(names) - (set(type(data).model_fields) - {'profile', 'edited_fields'}):
-        raise PreservationError('수정할 항목을 확인해 줘.')
+        raise PreservationError('수정할 항목을 확인해 주세요.')
     return bool(set(fields) & set(names))
 
 
@@ -53,7 +53,7 @@ def replace_context(document, values, quote):
         if old and old[0]['value'] == value:
             continue
         if len(old) > 1:
-            raise PreservationError('여러 사람의 이동 조건이 있어. 이 입력란으로 함께 바꾸지 않고 원래 조건을 유지했어. 인터뷰에서 바꿀 사람과 동선을 알려줘.')
+            raise PreservationError('여러 사람의 이동 조건이 있어요. 이 입력란으로 함께 바꾸지 않고 원래 조건을 유지했어요. 인터뷰에서 바꿀 사람과 동선을 알려주세요.')
         document['context'] = [c for c in document['context'] if c['key'] != key]
         if value:
             document['context'].append(dict(key=key, value=value, source_quote=quote))

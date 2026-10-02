@@ -60,7 +60,7 @@ class LeisureIndex:
                 'dates':{k:sorted({r['date'] for r in self.records.values() if r['kind']==k}) for k in ('park','library')},
                 'hobby_registered_counts':{k:len(self.hobby_rows(k)) for k in HOBBY_DETAILS},
                 'activities':ACTIVITIES, 'max_data_age_days':MAX_DATA_AGE,
-                'limitations':'공식 등록 위치의 직선거리야. 실제 경로·출입구·동반 규칙은 미확인이며 사설 후보/후기는 점수와 분리해.'}
+                'limitations':'공식 등록 위치의 직선거리예요. 실제 경로·출입구·동반 규칙은 미확인이며 사설 후보/후기는 점수와 분리해요.'}
 
     def select(self, criterion):
         p = criterion.parameters
@@ -83,8 +83,8 @@ class LeisureIndex:
         row = selected[0][1] if selected else None
         status = 'verified' if row and not uncertain else 'missing'
         note = f'지정 유형의 등록 장소까지 직선거리. 위치/자료 시점 미확인 {len(uncertain)}곳. '
-        if uncertain: note += '전체 최단거리와 점수는 확정하지 않았어. '
-        note += '실제 도보 경로·현재 이용 가능성·동반 규칙은 미확인이야.'
+        if uncertain: note += '전체 최단거리와 점수는 확정하지 않았어요. '
+        note += '실제 도보 경로·현재 이용 가능성·동반 규칙은 미확인이에요.'
         return {'value':round(selected[0][0],3) if row else None, 'status':status, 'note':note,
                 'selected':[row] if row else [], 'uncertain_count':len(uncertain), 'matched_registered_count':len(rows)}
 
@@ -160,7 +160,7 @@ class LeisureModule:
                 if cancel.is_set(): raise InterruptedError('cancelled')
                 if criterion.metric == MEETING_METRIC:
                     observation = {'value':round(distance_m(candidate.latitude,candidate.longitude,lat,lon),3), 'status':'verified',
-                        'note':f"사용자가 지정한 {p['meeting_label']}까지 직선거리. 교류 만족도·실제 이동시간은 미확인이야.", 'selected':[]}
+                        'note':f"사용자가 지정한 {p['meeting_label']}까지 직선거리. 교류 만족도·실제 이동시간은 미확인이에요.", 'selected':[]}
                     source,record,data_date = None,criterion.id,today().isoformat()
                 else:
                     observation = self.index.observe(criterion,candidate)
