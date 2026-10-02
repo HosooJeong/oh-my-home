@@ -462,6 +462,8 @@ def make_handler(state, env_path):
                          '/village-world.mjs': (STATIC / 'village-world.mjs', 'text/javascript; charset=utf-8'),
                          '/village-journey.mjs': (STATIC / 'village-journey.mjs', 'text/javascript; charset=utf-8'),
                          '/analysis-view.mjs': (STATIC / 'analysis-view.mjs', 'text/javascript; charset=utf-8'),
+                         '/result-report.mjs': (STATIC / 'result-report.mjs', 'text/javascript; charset=utf-8'),
+                         '/result-report.css': (STATIC / 'result-report.css', 'text/css; charset=utf-8'),
                          '/entry-places.mjs': (STATIC / 'entry-places.mjs', 'text/javascript; charset=utf-8'),
                          '/debug-session.mjs': (STATIC / 'debug-session.mjs', 'text/javascript; charset=utf-8'),
                          '/analysis.css': (STATIC / 'analysis.css', 'text/css; charset=utf-8'),

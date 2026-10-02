@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ko">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>살자리 · 내 생활권</title><link rel="stylesheet" href="/village.css"><link rel="stylesheet" href="/analysis.css"><script type="module" src="/analysis.mjs"></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>살자리 · 내 생활권</title><link rel="stylesheet" href="/village.css"><link rel="stylesheet" href="/analysis.css"><link rel="stylesheet" href="/result-report.css"><script type="module" src="/analysis.mjs"></script></head>
 <body><header class="app-header"><a class="brand" href="/">살자리</a><a class="text-button" href="/">조건 수정</a></header>
 <main id="analysis-app" data-phase="loading">
  <section id="journey-stage" class="journey-stage" data-mode="reading" aria-label="내 마을 분석 진행">
@@ -14,8 +14,14 @@
  <section id="review-panel" class="flow-panel" hidden><h1>내 조건 확인</h1><div id="review-groups"></div><details><summary>원래 요청과 남은 확인</summary><div id="review-origin"></div></details><p id="review-error" class="quiet" role="alert" hidden></p><button id="confirm-profile" class="primary" type="button">이 조건으로 분석</button></section>
  <section id="error-panel" class="flow-panel" role="alert" hidden><h1 id="error-title"></h1><p id="error-detail" class="quiet"></p><button id="retry-analysis" class="primary" type="button">다시 시작</button><a class="text-button" href="/">조건 수정</a></section>
  <section id="scope-panel" class="flow-panel" hidden><h1>어느 지역부터 알아볼까?</h1><p id="scope-reason" class="quiet"></p><form id="scope-form"><div class="question-field"><label for="scope-area">관심 지역</label><select id="scope-area"></select></div><button class="primary" type="submit">조사할 지점 선택</button></form></section>
+ <section id="report-panel" class="personal-report" hidden aria-label="나의 조건 충족도 보고서">
+  <div class="report-heading"><h2>내 조건과 얼마나 맞을까?</h2><label for="report-candidate">분석할 집<select id="report-candidate"></select></label></div>
+  <div class="report-layout"><figure id="report-radar" class="report-radar"></figure><div class="report-reading"><div id="report-tabs" class="report-tabs" role="tablist" aria-label="평가 분야"></div><section id="report-content" class="report-content" role="tabpanel" tabindex="0"></section></div></div>
+ </section>
  <section id="map-panel" hidden><div class="result-heading"><div><span id="entry-label" class="eyebrow"></span><h1 id="view-title"></h1><p id="view-note" class="quiet"></p></div><button id="add-comparison" class="text-button" type="button" hidden>주변 비교 추가</button></div><div class="analysis-layout"><div class="map-column"><div id="analysis-map" role="region" aria-label="집과 주변 시설 지도"><p id="map-fallback">지도를 준비하고 있어</p></div><div id="place-controls"><form id="place-form"><label for="place-name">집 이름</label><input id="place-name" maxlength="40" placeholder="지도에서 위치를 선택해"><details><summary>좌표로 입력</summary><div class="pair"><label>위도<input id="place-lat" type="number" step="any" min="-90" max="90" placeholder="35.18"></label><label>경도<input id="place-lon" type="number" step="any" min="-180" max="180" placeholder="128.10"></label></div><button type="submit">이 위치 추가</button></details></form><ol id="place-list"></ol><button id="run-comparison" class="primary" type="button" disabled>이 집 분석</button></div><div id="result-scope" class="quiet"></div></div><div id="result-list" class="result-list"></div></div></section>
+ <div id="report-supplements" hidden>
  <section id="reference-panel" class="reference-panel" hidden><h2>집·비용 <span class="quiet">참고</span></h2><div id="housing-result"></div></section>
  <section id="research-panel" class="reference-panel" hidden><div class="research-heading"><h2>주변 이야기</h2><button id="cancel-research" class="text-button" type="button" hidden>조사 취소</button></div><p id="research-status" class="quiet" role="status"></p><p id="research-counts" class="quiet"></p><details id="research-request-panel" hidden><summary id="research-request-summary">요청한 조사</summary><div id="research-requests"></div></details><div id="research-results"></div></section>
+ </div>
  <output id="analysis-state" hidden></output><output id="journey-state" hidden></output>
 </main></body></html>

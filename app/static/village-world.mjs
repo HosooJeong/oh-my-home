@@ -1,7 +1,7 @@
 import {CATEGORIES,RADII,evaluationShares as shares,moveBlock,levelForPosition} from './village-model.mjs';
 import {createToyModels,addToyStudio} from './village-models.mjs';
 
-export function createVillageWorld(T,{canvas,container,labelsRoot,fallback,getDraft,getMode,onChange=()=>{},onSave=()=>{},onStatus=()=>{},onState=()=>{}}){
+export function createVillageWorld(T,{canvas,container,labelsRoot,fallback,getDraft,getMode,onChange=()=>{},onSave=()=>{},onStatus=()=>{},onState=()=>{},onSelect=()=>{}}){
  const motion=!matchMedia('(prefers-reduced-motion: reduce)').matches;
  let presentation={mode:null,focus:null,statuses:{}},cameraTarget=new T.Vector3(),targetZoom=1,townZoom=1;
  const renderer=new T.WebGLRenderer({canvas,antialias:true,alpha:false});renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.5));renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;renderer.setClearColor('#e9eee3');
@@ -37,7 +37,7 @@ export function createVillageWorld(T,{canvas,container,labelsRoot,fallback,getDr
  const highlight=mesh(scene,new T.TorusGeometry(.98,.025,5,48),'#f8efbf',0,.19,0);highlight.rotation.x=Math.PI/2;highlight.visible=false;highlight.castShadow=false;
  const bus=toys.bus('#e3ba72',true);scene.add(bus);
  const people=[];for(const [x,z,color] of [[-3,9,'#cb8872'],[9,5,'#8cabc0']]){const p=toys.person(color);p.scale.setScalar(.75);p.position.set(x,.2,z);scene.add(p);people.push(p);}
- const raycaster=new T.Raycaster(),pointer=new T.Vector2(),floor=new T.Plane(new T.Vector3(0,1,0),-.15),point=new T.Vector3();
+ const raycaster=new T.Raycaster(),pointer=new T.Vector2(),floor=new T.Plane(new T.Vector3(0,1,0),-.15),point=new T.Vector3();let reportTap=null;
  function updateCamera(){const r=27;camera.position.set(Math.sin(yaw)*r,24,Math.cos(yaw)*r);camera.position.add(cameraTarget);camera.lookAt(cameraTarget);camera.zoom=zoomValue;camera.updateProjectionMatrix();camera.updateMatrixWorld();}
  function resize(){const width=container.clientWidth,height=container.clientHeight;if(!width||!height||!available)return;const aspect=width/height,entry=['start','location'].includes(getMode()),mobile=width<740;
   const v=entry?(mobile?14/aspect:Math.max(17.5,26/aspect)):Math.max(15,(mobile?14:18)/aspect),offset=entry&&!mobile?.22:0,verticalOffset=entry&&mobile?-v*.13:0;
@@ -55,23 +55,24 @@ export function createVillageWorld(T,{canvas,container,labelsRoot,fallback,getDr
  function present(value){if(presentation.mode==='town'&&value.mode!=='town')townZoom=zoomValue;if(value.mode==='town'&&presentation.mode!=='town')zoomValue=townZoom;presentation={...presentation,...value};sync();if(document.hidden)advance(10);}
  function hit(event){const b=canvas.getBoundingClientRect();pointer.set((event.clientX-b.left)/b.width*2-1,-(event.clientY-b.top)/b.height*2+1);raycaster.setFromCamera(pointer,camera);}
  function floorPoint(event){hit(event);return raycaster.ray.intersectPlane(floor,point);}
- function findBlock(event){hit(event);const intersection=raycaster.intersectObjects([...models.values()].filter(g=>g.visible),true)[0];if(!intersection)return null;let object=intersection.object;while(object&&!object.userData.category)object=object.parent;return object?.userData.category||null;}
+ function findBlock(event,includeHome=false){hit(event);const intersection=raycaster.intersectObjects([...models.values(),...(includeHome?[house]:[])].filter(g=>g.visible),true)[0];if(!intersection)return null;let object=intersection.object;while(object&&!object.userData.category&&object!==house)object=object.parent;return object===house?'overview':object?.userData.category||null;}
  function cancelDrag(){if(drag?.id){const b=getDraft().blocks.find(b=>b.id===drag.id);if(b)Object.assign(b,drag.before);}drag=null;guide.visible=false;canvas.style.cursor='';sync();}
  canvas.addEventListener('pointerdown',event=>{
+  if(presentation.mode==='results'&&event.button===0){const id=findBlock(event,true);if(id){reportTap={id,pointer:event.pointerId,x:event.clientX,y:event.clientY};canvas.setPointerCapture(event.pointerId);event.preventDefault();}return;}
   if(getMode()!=='town'||event.button!==0||drag)return;const id=findBlock(event),p=floorPoint(event);
   if(id){const b=getDraft().blocks.find(b=>b.id===id);getDraft().focus=id;drag={id,before:{x:b.x,z:b.z},offset:p?{x:b.x-p.x,z:b.z-p.z}:{x:0,z:0},pointer:event.pointerId};}
   else drag={id:null,lastX:event.clientX,pointer:event.pointerId};
   canvas.setPointerCapture(event.pointerId);canvas.style.cursor=id?'grabbing':'ew-resize';onChange();event.preventDefault();
  });
  canvas.addEventListener('pointermove',event=>{
-  if(!drag){if(getMode()==='town'&&elapsed-lastHover>.08){lastHover=elapsed;hovered=findBlock(event);canvas.style.cursor=hovered?'grab':'ew-resize';}return;}
+  if(!drag){if((getMode()==='town'||presentation.mode==='results')&&elapsed-lastHover>.08){lastHover=elapsed;hovered=findBlock(event,presentation.mode==='results');canvas.style.cursor=presentation.mode==='results'?(hovered?'pointer':''):(hovered?'grab':'ew-resize');}return;}
   if(drag.pointer!==event.pointerId)return;
   if(drag.id){const p=floorPoint(event);if(p&&moveBlock(getDraft(),drag.id,p.x+drag.offset.x,p.z+drag.offset.z)){getDraft().handoff=false;onChange();}}
   else{yaw-=(event.clientX-drag.lastX)*.008;drag.lastX=event.clientX;updateCamera();draw();onState();}
  });
  canvas.addEventListener('pointerleave',()=>{if(!drag){hovered=null;canvas.style.cursor='';}});
- function finishDrag(event){if(!drag||drag.pointer!==event.pointerId)return;const id=drag.id;drag=null;guide.visible=false;canvas.style.cursor='';if(id)models.get(id).userData.landed=elapsed;onSave();onChange();if(id){const b=getDraft().blocks.find(b=>b.id===id);onStatus(`${CATEGORIES.find(c=>c.id===id).label} · 중요도 ${6-levelForPosition(b.x,b.z)}/5`);}}
- canvas.addEventListener('pointerup',finishDrag);canvas.addEventListener('pointercancel',()=>{cancelDrag();onChange();});canvas.addEventListener('lostpointercapture',event=>{if(drag&&drag.pointer===event.pointerId){cancelDrag();onChange();}});
+ function finishDrag(event){if(reportTap&&reportTap.pointer===event.pointerId){const tap=reportTap;reportTap=null;if(Math.hypot(event.clientX-tap.x,event.clientY-tap.y)<8)onSelect(tap.id);return;}if(!drag||drag.pointer!==event.pointerId)return;const id=drag.id;drag=null;guide.visible=false;canvas.style.cursor='';if(id)models.get(id).userData.landed=elapsed;onSave();onChange();if(id){const b=getDraft().blocks.find(b=>b.id===id);onStatus(`${CATEGORIES.find(c=>c.id===id).label} · 중요도 ${6-levelForPosition(b.x,b.z)}/5`);}}
+ canvas.addEventListener('pointerup',finishDrag);canvas.addEventListener('pointercancel',()=>{reportTap=null;cancelDrag();onChange();});canvas.addEventListener('lostpointercapture',event=>{reportTap=null;if(drag&&drag.pointer===event.pointerId){cancelDrag();onChange();}});
  canvas.addEventListener('wheel',event=>{if(getMode()!=='town')return;event.preventDefault();zoomValue=Math.min(2.8,Math.max(.8,zoomValue*Math.exp(-event.deltaY*.001)));updateCamera();draw();},{passive:false});
  function draw(){
   if(container.hidden||!available)return;
@@ -80,10 +81,10 @@ export function createVillageWorld(T,{canvas,container,labelsRoot,fallback,getDr
  }
  function advance(dt){elapsed+=dt;
   const stage=presentation.mode||getMode(),focus=presentation.focus||(stage==='detail'?getDraft().focus:null),selected=getDraft().blocks.find(b=>b.id===focus);
-  const destination=selected&&['detail','questions'].includes(stage)?new T.Vector3(selected.x,.4,selected.z):['reveal','results'].includes(stage)?new T.Vector3(0,1,0):new T.Vector3();
+  const destination=selected&&['detail','questions','results'].includes(stage)?new T.Vector3(selected.x,.4,selected.z):['reveal','results'].includes(stage)?new T.Vector3(0,1,0):new T.Vector3();
   const cameraBlend=motion?1-Math.exp(-dt*5):1;
   cameraTarget.lerp(destination,cameraBlend);
-  targetZoom=selected&&['detail','questions'].includes(stage)?1.75:['reveal','results'].includes(stage)?2:1;
+  targetZoom=selected&&['detail','questions','results'].includes(stage)?(stage==='results'?1.55:1.75):['reveal','results'].includes(stage)?2:1;
   if(getMode()!=='town')zoomValue=T.MathUtils.lerp(zoomValue,targetZoom,cameraBlend);
   else cameraTarget.lerp(new T.Vector3(),cameraBlend);
   updateCamera();
