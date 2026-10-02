@@ -14,9 +14,9 @@ function renderHousingReference(reference) {
   const target = $('housing-reference'); target.replaceChildren();
   target.append(node('p', reference.scope), node('p', `신고 거래 ${reference.sample_count.toLocaleString()}건 · 가격 점수 반영 0`, 'hint'));
   if (reference.status !== 'available') {
-    target.append(node('p', {unavailable:'실거래 자료를 준비하지 못했어. 자료 준비 후 서버를 다시 시작해 줘.',
-      empty:'이 범위의 거래 자료가 없어. 0원이라는 뜻은 아니야.',
-      insufficient:'표본이 5건 미만이라 가격 요약을 유보했어.'}[reference.status], 'unknown'));
+    target.append(node('p', {unavailable:'실거래 자료를 준비하지 못했어요. 자료 준비 후 서버를 다시 시작해 주세요.',
+      empty:'이 범위의 거래 자료가 없어요. 0원이라는 뜻은 아니에요.',
+      insufficient:'표본이 5건 미만이라 가격 요약을 유보했어요.'}[reference.status], 'unknown'));
     return;
   }
   const table = node('table'); const head = node('thead'), header = node('tr');
@@ -33,7 +33,7 @@ function renderHousingReference(reference) {
     const c = reference.contract_counts;
     target.append(node('p', `신규 ${c.new}건 · 갱신 ${c.renewal}건 · 구분 미확인 ${c.unknown}건`, 'hint'));
   }
-  target.append(node('p', '가운데 50%는 25~75백분위 구간이야. 범위 안에 같은 가격의 집이 지금 있다는 뜻은 아니야.', 'hint'));
+  target.append(node('p', '가운데 50%는 25~75백분위 구간이야. 범위 안에 같은 가격의 집이 지금 있다는 뜻은 아니에요.', 'hint'));
 }
 async function queryHousing() {
   if (housingBusy || !housingAvailable) return;
@@ -41,7 +41,7 @@ async function queryHousing() {
     area_min_m2:Number($('housing-area-min').value), area_max_m2:Number($('housing-area-max').value),
     contract:$('housing-tenure').value === 'sale' ? 'all' : $('housing-contract').value};
   if (query.area_min_m2 >= query.area_max_m2) {
-    $('housing-reference').replaceChildren(node('p', '최대 면적은 최소 면적보다 크게 입력해 줘.', 'unknown')); return;
+    $('housing-reference').replaceChildren(node('p', '최대 면적은 최소 면적보다 크게 입력해 주세요.', 'unknown')); return;
   }
   housingBusy = true; updateHousingControls();
   try {renderHousingReference(await api('/api/housing-reference', query));$('housing-filter-status').textContent='';}
@@ -52,7 +52,7 @@ async function initHousing(metadata) {
   housingAvailable = Boolean(metadata?.available);
   $('housing-data-note').textContent = housingAvailable
     ? `아파트 계약 ${metadata.period_start} ~ ${metadata.period_end} · 원본 조회 ${metadata.retrieved_at.slice(0,10)}. 매매 ${metadata.counts.sale.toLocaleString()}건, 전세 ${metadata.counts.jeonse.toLocaleString()}건, 월세 ${metadata.counts.monthly.toLocaleString()}건. 해제 매매 ${metadata.excluded.cancelled_sale}건 제외.`
-    : '아파트 실거래 참고 자료가 아직 없어. 생활·교통 비교는 계속 사용할 수 있어.';
+    : '아파트 실거래 참고 자료가 아직 없어요. 생활·교통 비교는 계속 사용할 수 있어요.';
   for (const area of metadata?.legal_areas || []) {const option=node('option',area);option.value=area;$('housing-area').append(option);}
   for (const text of metadata?.limitations || []) $('housing-limitations').append(node('p',text,'hint'));
   updateHousingControls();
@@ -67,4 +67,4 @@ function renderHousingRun() {
   }
 }
 $('housing-form').addEventListener('submit', event=>{event.preventDefault();if(!state.busy){housingTouched=true;queryHousing();}});
-$('housing-form').addEventListener('input',()=>{housingTouched=true;$('housing-filter-status').textContent='조회 조건 수정 중 · 버튼을 눌러 반영해 줘.';updateHousingControls();});
+$('housing-form').addEventListener('input',()=>{housingTouched=true;$('housing-filter-status').textContent='조회 조건 수정 중 · 버튼을 눌러 반영해 주세요.';updateHousingControls();});

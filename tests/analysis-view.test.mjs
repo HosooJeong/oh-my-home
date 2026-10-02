@@ -30,7 +30,7 @@ test('price-only hard needs remain in reviewed state while reference query carri
  const query=housingQueryProfile(p);assert.deepEqual(p,before);assert.deepEqual(query.criteria,[]);assert.deepEqual(query.questions,[]);assert.deepEqual(query.context.slice(0,2),p.context);assert.ok(query.context.some(c=>c.key==='housing_reference'&&c.value==='requested'));assert.ok(p.criteria[0].hard);assert.equal(p.questions.length,1);
 });
 test('saturated distance utility does not invent an advantage for a shorter distance',()=>{
- const p=profile(),r=run(p,{a:{mart:100,school:200},b:{mart:300,school:400}});const v=candidateViews(p,r,places);assert.equal(v[0].comparisons.length,0);assert.match(v[0].comparisonNote,/차이가 없어/);
+ const p=profile(),r=run(p,{a:{mart:100,school:200},b:{mart:300,school:400}});const v=candidateViews(p,r,places);assert.equal(v[0].comparisons.length,0);assert.match(v[0].comparisonNote,/평가값 차이 없음/);
 });
 test('unknown peer cannot generate a comparison; a verified zero stays a measurement',()=>{
  const p=profile(),r=run(p,{a:{mart:0},b:{}}),v=candidateViews(p,r,places);assert.equal(v[0].comparisons.length,0);assert.equal(v[0].rows[0].known,true);assert.equal(v[0].rows[0].measure,'0m · 직선거리');assert.equal(v[0].unknown.length,1);assert.equal(v[1].unknown.length,2);

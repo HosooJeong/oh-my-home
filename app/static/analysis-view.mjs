@@ -37,8 +37,8 @@ export function profileView(profile){
   excluded:profile.criteria.filter(c=>weights[c.id]===0&&!c.hard),pendingQuestions:profile.questions};
 }
 export function confirmReviewedProfile(profile,snapshot){
- if(snapshot!==undefined&&JSON.stringify(profile)!==snapshot)throw new Error('확인할 조건이 바뀌었어. 다시 확인해 줘.');
- if(profile.questions.some(q=>q.blocking))throw new Error('필요한 답변을 먼저 입력해 줘.');
+ if(snapshot!==undefined&&JSON.stringify(profile)!==snapshot)throw new Error('확인할 조건이 바뀌었어요. 다시 확인해 주세요.');
+ if(profile.questions.some(q=>q.blocking))throw new Error('필요한 답변을 먼저 입력해 주세요.');
  const copy=structuredClone(profile),view=profileView(profile),groups=new Set(view.groups.map(g=>g.id)),criteria=new Set(view.groups.flatMap(g=>g.criteria.map(c=>c.id)));
  copy.revision++;for(const g of copy.groups)if(groups.has(g.id))g.source='user';
  for(const c of copy.criteria)if(criteria.has(c.id)){c.source='user';c.importance_source='user';}
@@ -49,7 +49,7 @@ export function housingQueryProfile(profile){
  // A reference lookup uses context filters, never verdicts on criteria or interview answers.
  if(profile.groups.some(g=>g.weight>0))return profile;
  const copy=structuredClone(profile);copy.groups=copy.groups.filter(g=>g.id==='housing');
- if(!copy.groups.length)throw new Error('실거래 참고 범위를 확인해 줘.');
+ if(!copy.groups.length)throw new Error('실거래 참고 범위를 확인해 주세요.');
  copy.criteria=[];copy.questions=[];
  if(!copy.context.some(c=>c.key==='housing_reference'&&c.value==='requested'))copy.context.push({key:'housing_reference',value:'requested',source_quote:profile.request.slice(0,500)});
  return copy;
@@ -86,11 +86,11 @@ export function candidateViews(profile,run,places){
   for(const row of view.rows.filter(r=>r.known&&r.weight>0))for(const other of views.filter(v=>v!==view&&v.assessment.eligibility!=='ineligible')){
    const peer=other.rows.find(r=>r.criterion.id===row.criterion.id&&r.known);if(!peer)continue;
    shared++;const gap=(row.fit-peer.fit)*row.weight;if(Math.abs(gap)<1e-9)continue;
-   differences.push({gap,text:`${row.criterion.label}: ${other.place.label}보다 내 기준에서 ${gap>0?'유리':'불리'}해 (${row.measure}, 비교 ${peer.measure})`,criterionId:row.criterion.id,peerId:other.place.id});
+   differences.push({gap,text:`${row.criterion.label}: ${other.place.label}보다 내 기준에서 ${gap>0?'유리':'불리'}해요 (${row.measure}, 비교 ${peer.measure})`,criterionId:row.criterion.id,peerId:other.place.id});
   }
   const good=differences.filter(x=>x.gap>0).sort((a,b)=>b.gap-a.gap),bad=differences.filter(x=>x.gap<0).sort((a,b)=>a.gap-b.gap);
   view.comparisons=[good[0],bad[0]].filter(Boolean);
-  view.comparisonNote=views.length===1?'한 곳 분석이야. 후보 간 우열은 비교하지 않았어.':view.assessment.eligibility==='ineligible'?'필수조건을 충족하지 못해 추천 순위에서 제외돼.':shared?'함께 확인한 조건의 평가값에 차이가 없어.':'후보 간 유불리를 비교할 공통 근거가 부족해.';
+  view.comparisonNote=views.length===1?'한 곳 분석 · 후보 간 비교 없음':view.assessment.eligibility==='ineligible'?'필수조건 미충족 · 추천 순위 제외':shared?'공통 조건의 평가값 차이 없음':'후보 비교 근거 부족';
   if(view.assessment.eligibility==='ineligible')view.comparisons=[];
  }
  return views;

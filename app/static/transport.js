@@ -32,7 +32,7 @@ $('stop-mandatory').addEventListener('change', updateTransportControls);
 watchEdits('transport-form',{'travel-mode':'mode','travel-destination':'destination','travel-time':'time_of_day','include-stop':'include_stop','stop-ideal':'ideal','stop-limit':'limit','transport-weight':'group_weight','stop-importance':'importance','stop-mandatory':'mandatory_limit','stop-hard-limit':'hard_limit'});
 $('transport-form').addEventListener('input', () => {
   state.transportDirty = true;
-  notice('교통 조건을 수정했어. 교통 조건 적용을 누르면 비교에 반영돼.');
+  notice('교통 조건을 수정했어요. 교통 조건 적용을 누르면 비교에 반영돼요.');
   updateCompare();
 });
 function appendCategoryContributions(card, assessment) {
@@ -68,7 +68,7 @@ $('transport-form').addEventListener('submit', async event => {
       edited_fields:editedFields('transport-form'),
     });
     setProfile(result.profile);
-    notice('교통 조건을 반영했어. 같은 후보로 다시 비교하면 새 조건을 적용해.');
+    notice('교통 조건을 반영했어요. 같은 후보로 다시 비교하면 새 조건을 적용해.');
   } catch(error) { notice(error.message, true); }
   finally { busy(false); }
 });

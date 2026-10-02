@@ -101,7 +101,7 @@ export function createVillageWorld(T,{canvas,container,labelsRoot,fallback,getDr
   }draw();onState();}
  function loop(time){if(!document.hidden&&!container.hidden&&available)advance(Math.min((time-lastTime)/1000,.05));lastTime=time;requestAnimationFrame(loop);}
  new ResizeObserver(resize).observe(container);document.addEventListener('fullscreenchange',resize);
- canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();cancelDrag();available=false;fallback.hidden=false;onChange();onStatus('3D 연결이 끊겼어. 화면을 새로고침해 봐.');});
+ canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();cancelDrag();available=false;fallback.hidden=false;onChange();onStatus('3D 연결이 끊겼어요. 새로고침해 주세요.');});
  updateCamera();sync();requestAnimationFrame(loop);
  return {sync,present,cancelDrag,advance,get available(){return available;},get pose(){return {zoom:zoomValue,target:cameraTarget.toArray(),opacity:Object.fromEntries([...models].filter(([,g])=>g.visible).map(([id,g])=>[id,g.userData.opacity??1]))};},get yaw(){return yaw;},get dragId(){return drag?.id||null;},rotate(amount){if(drag)return;yaw+=amount;updateCamera();draw();onState();},zoom(factor){zoomValue=Math.min(2.8,Math.max(.8,zoomValue*factor));updateCamera();draw();}};
 }

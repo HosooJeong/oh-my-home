@@ -21,7 +21,7 @@ function renderReviews() {
   if (reviewState.key !== state.run.review_key) {
     resetReviews(); reviewState.key = state.run.review_key;
     facilities.filter(f => !state.run.research_facility_ids || state.run.research_facility_ids.includes(f.id)).slice(0, 3).forEach(f => reviewState.selected.add(f.id));
-    $('reviews-status').textContent = '선택한 공공자료의 매장명·주소로 후기를 찾아. 한 비교에서 1회, 최대 3곳을 조사할 수 있어. 작성 2년 이내이고 원문·작성일·주소를 확인한 자료만 사용해.';
+    $('reviews-status').textContent = '선택한 공공자료의 매장명·주소로 후기를 찾아. 한 비교에서 1회, 최대 3곳을 조사할 수 있어요. 작성 2년 이내이고 원문·작성일·주소를 확인한 자료만 사용해.';
   }
   $('reviews-panel').hidden = !facilities.length;
   $('review-facilities').replaceChildren();
@@ -32,7 +32,7 @@ function renderReviews() {
     const input = node('input'); input.type = 'checkbox'; input.checked = reviewState.selected.has(facility.id);
     input.setAttribute('aria-label', `${facility.name} 후기 조사 선택`);
     input.addEventListener('change', () => {
-      if (input.checked && reviewState.selected.size >= 3) {input.checked = false; $('reviews-status').textContent = '최대 3곳을 선택해 줘.'; return;}
+      if (input.checked && reviewState.selected.size >= 3) {input.checked = false; $('reviews-status').textContent = '최대 3곳을 선택해 주세요.'; return;}
       if (input.checked) reviewState.selected.add(facility.id); else reviewState.selected.delete(facility.id);
       updateReviewControls();
     });
@@ -54,7 +54,7 @@ function renderReviews() {
         detail.append(identity); card.append(detail);
       }
       if (!result.excerpts.length) card.append(node('p', result.status === 'unverified'
-        ? '최신 작성일·원문·주소를 확인하지 못했거나 부정확한 근거여서 보완 내용을 보류했어.' : '연결된 공개 웹에서 인용할 만한 후기를 찾지 못했어.', 'unknown'));
+        ? '최신 작성일·원문·주소를 확인하지 못했거나 부정확한 근거여서 보완 내용을 보류했어요.' : '연결된 공개 웹에서 인용할 만한 후기를 찾지 못했어요.', 'unknown'));
       card.append(node('p', `조사 ${new Date(reviewState.result.checked_at).toLocaleString('ko-KR')}`, 'hint'));
     }
     $('review-facilities').append(card);
@@ -67,7 +67,7 @@ async function startReviews(existingJob=null) {
   const id = existingJob?.id || globalThis.crypto?.randomUUID?.() || `r${Date.now()}_${Math.random().toString(36).slice(2)}`;
   reviewState.job = id; reviewState.accepted = false; reviewState.cancelled = false;
   reviewState.requested = true; busy(true); $('reviews-cancel').hidden = false;
-  $('reviews-status').textContent = '필요한 웹자료를 검색하고 원문·작성일·대상을 대조하고 있어. 몇 분 걸릴 수 있어.';
+  $('reviews-status').textContent = '필요한 웹자료를 검색하고 원문·작성일·대상을 대조하고 있어요. 몇 분 걸릴 수 있어요.';
   if(typeof setSafetyStatus==='function')setSafetyStatus($('reviews-status').textContent);
   if(typeof updateSafetyControls==='function')updateSafetyControls();
   try {
@@ -76,21 +76,21 @@ async function startReviews(existingJob=null) {
     if (reviewState.cancelled && job.status === 'running') await api('/api/jobs/' + id + '/cancel', {});
     while (job.status === 'running') {await new Promise(resolve=>setTimeout(resolve,900));job=await api('/api/jobs/'+id);}
     if (key !== reviewState.key) return;
-    if (reviewState.cancelled || job.status === 'cancelled') $('reviews-status').textContent = '후기 조사를 취소했어.';
+    if (reviewState.cancelled || job.status === 'cancelled') $('reviews-status').textContent = '후기 조사를 취소했어요.';
     else if (job.status === 'completed') {
       reviewState.result = job.result; renderReviews();if(typeof renderLeisure==='function')renderLeisure();if(typeof renderSafety==='function')renderSafety();
-      $('reviews-status').textContent = job.result.errors?.length ? '일부 웹 보완 조사를 완료하지 못했어. 확인된 출처만 참고하고 나머지는 미확인으로 남겼어.'
-        : job.result.safety && !job.result.leisure && !job.result.items.length ? '이번에는 안전·환경의 공식 지역자료를 보완했어. 상가 후기는 조사하지 않았어.'
-        : '최신 웹 보완 조사가 끝났어. 일부 작성자의 경험이며, 전체 평판이나 현재 상태를 보장하지 않아. 거리 점수에는 반영하지 않았어.';
-    } else $('reviews-status').textContent = messages[job.error] || '후기 조사를 완료하지 못했어. 지도 링크에서 직접 살펴볼 수 있어.';
+      $('reviews-status').textContent = job.result.errors?.length ? '일부 웹 보완 조사를 완료하지 못했어요. 확인된 출처만 참고하고 나머지는 미확인으로 남겼어.'
+        : job.result.safety && !job.result.leisure && !job.result.items.length ? '이번에는 안전·환경의 공식 지역자료를 보완했어요. 상가 후기는 조사하지 않았어요.'
+        : '최신 웹 보완 조사가 끝났어. 일부 작성자의 경험이며, 전체 평판이나 현재 상태를 보장하지 않아요. 거리 점수에는 반영하지 않았어요.';
+    } else $('reviews-status').textContent = messages[job.error] || '후기 조사를 완료하지 못했어요. 지도 링크에서 직접 살펴볼 수 있어요.';
   } catch(error) { $('reviews-status').textContent = error.message; }
   finally { if(!reviewState.result?.safety&&typeof setSafetyStatus==='function')setSafetyStatus($('reviews-status').textContent);reviewState.job=null; busy(false);if(typeof renderLeisure==='function')renderLeisure(); $('reviews-cancel').hidden=true;
-    if (key===reviewState.key) $('reviews-status').textContent += ' 다시 조사하려면 위치 비교를 새로 실행해 줘.'; }
+    if (key===reviewState.key) $('reviews-status').textContent += ' 다시 조사하려면 위치 비교를 새로 실행해 주세요.'; }
 }
 $('reviews-search').addEventListener('click', () => startReviews());
 $('reviews-cancel').addEventListener('click', async()=>{
   if (!reviewState.job) return;
-  reviewState.cancelled=true; $('reviews-status').textContent='조사 취소를 요청했어.';
+  reviewState.cancelled=true; $('reviews-status').textContent='조사 취소를 요청했어요.';
   try {if(reviewState.accepted)await api('/api/jobs/'+reviewState.job+'/cancel',{});}
   catch(error){$('reviews-status').textContent=error.message;}
 });

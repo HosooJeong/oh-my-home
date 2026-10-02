@@ -46,5 +46,5 @@ test('qualitative notes require category-bound request IDs and remain distinct f
  assert.deepEqual(researchNotes(data,requests,'living').map(n=>n.excerpt?.quote),['생활']);assert.deepEqual(researchNotes(data,requests,'education').map(n=>n.excerpt?.quote),['학원']);assert.equal(researchNotes(data,requests,'safety')[0].kind,'area');assert.equal(researchNotes(data,requests,'leisure').length,2);assert.equal(researchNotes(data,requests,'housing').length,0);assert.equal(researchNotes(data,requests).length,6);
 });
 test('evaluation reason uses the candidate measurement and personal target, while missing stays undecided',()=>{
- const p=profile(),[v]=views(p,{a:{mart:800,clinic:200,school:null}});assert.match(criterionReason(v.rows[0]),/목표보다 300m 더 멀어/);assert.match(criterionReason(v.rows[1]),/목표 수준을 충족/);assert.match(criterionReason(v.rows[2]),/판단할 수 없어/);
+ const p=profile(),[v]=views(p,{a:{mart:800,clinic:200,school:null}});assert.match(criterionReason(v.rows[0]),/목표보다 300m 더 멀어/);assert.match(criterionReason(v.rows[1]),/목표 수준을 충족/);assert.match(criterionReason(v.rows[2]),/충족 여부는 미확인/);
 });

@@ -2,12 +2,12 @@
 import {readCandidates} from './entry-places.mjs';
 export const STORAGE_KEY='saljari.village.v1';
 export const CATEGORIES=Object.freeze([
- {id:'living',label:'생활·건강',short:'생활',color:'#e49375',angle:-150,question:'장보기와 일상에서 가까웠으면 하는 곳은?',placeholder:'큰 마트에서 자주 장을 봐. 걸어서 10분 정도면 좋겠어.'},
- {id:'transport',label:'교통·동선',short:'교통',color:'#e9bc62',angle:-90,question:'주로 어디로, 어떻게 이동해?',placeholder:'버스로 출퇴근해. 정류장이 가깝고 환승이 적으면 좋겠어.'},
- {id:'education',label:'교육·육아',short:'교육',color:'#7babc4',angle:-30,question:'학교·학원·통학에서 중요한 것은?',placeholder:'초등학생 아이가 있어. 학교와 영어 학원이 가까웠으면 해.'},
- {id:'safety',label:'안전·환경',short:'안전',color:'#9c9ac5',angle:30,question:'특히 확인하고 싶은 주변 환경은?',placeholder:'저녁에 걸어 다녀. 야간 보행과 주변 소음이 신경 쓰여.'},
- {id:'leisure',label:'여가·관계',short:'여가',color:'#87b49a',angle:90,question:'즐기는 취미나 자주 만나는 장소는?',placeholder:'탁구를 즐겨. 자유롭게 이용할 곳과 산책할 공원이 있으면 해.'},
- {id:'housing',label:'집·비용',short:'비용',color:'#ba9b7d',angle:150,question:'주거 형태·면적·예산은 어떻게 생각해?',placeholder:'아파트 전세를 생각해. 주변 실거래 수준을 참고하고 싶어.'},
+ {id:'living',label:'생활·건강',short:'생활',color:'#e49375',angle:-150,question:'일상에서 가까웠으면 하는 곳은 어디인가요?',placeholder:'큰 마트에서 자주 장을 봐요. 걸어서 10분 정도면 좋겠어요.'},
+ {id:'transport',label:'교통·동선',short:'교통',color:'#e9bc62',angle:-90,question:'주로 어디로, 어떻게 이동하시나요?',placeholder:'버스로 출퇴근해요. 정류장이 가깝고 환승이 적으면 좋겠어요.'},
+ {id:'education',label:'교육·육아',short:'교육',color:'#7babc4',angle:-30,question:'학교·학원·통학에서 무엇이 중요한가요?',placeholder:'초등학생 아이가 있어요. 학교와 영어 학원이 가까우면 좋겠어요.'},
+ {id:'safety',label:'안전·환경',short:'안전',color:'#9c9ac5',angle:30,question:'확인하고 싶은 주변 환경이 있나요?',placeholder:'저녁에 걸어 다녀요. 야간 보행과 주변 소음이 신경 쓰여요.'},
+ {id:'leisure',label:'여가·관계',short:'여가',color:'#87b49a',angle:90,question:'즐기는 취미나 자주 찾는 장소가 있나요?',placeholder:'탁구를 즐겨요. 자유롭게 이용할 곳과 산책할 공원이 있으면 좋겠어요.'},
+ {id:'housing',label:'집·비용',short:'비용',color:'#ba9b7d',angle:150,question:'주거 형태·면적·예산은 어떻게 생각하시나요?',placeholder:'아파트 전세를 생각해요. 주변 실거래가를 참고하고 싶어요.'},
 ]);
 export const RADII=Object.freeze([2.4,3.6,4.8,6,7.2]);
 export const FLOOR_LIMIT=7.9;

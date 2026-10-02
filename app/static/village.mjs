@@ -1,3 +1,4 @@
+import {loadKakaoMaps} from './kakao-map.mjs';
 import {CATEGORIES,STORAGE_KEY,RADII,readDraft,buildRequest,evaluationShares as shares,levelForPosition,toggleCategory,moveBlock} from './village-model.mjs';
 import {createVillageWorld} from './village-world.mjs';
 import {entryReady,addCandidate} from './entry-places.mjs';
@@ -36,7 +37,7 @@ function icon(name){
 }
 document.querySelectorAll('[data-icon]').forEach(el=>el.append(icon(el.dataset.icon)));
 const status=message=>$('village-status').textContent=message;
-function save(){try{sessionStorage.setItem(STORAGE_KEY,JSON.stringify(draft));}catch{status('현재 화면에서는 입력 저장을 사용할 수 없어.');}}
+function save(){try{sessionStorage.setItem(STORAGE_KEY,JSON.stringify(draft));}catch{status('입력을 저장하지 못했어요.');}}
 function snapshot(){
  const percentages=shares(draft.blocks);
  return {mode,coordinate_system:'virtual floor: origin=home; X/Z horizontal; Y height; camera never changes priorities',focus:draft.focus,
@@ -59,9 +60,9 @@ function render(){
  $('town-tools').hidden=mode!=='town';$('detail-panel').hidden=!['detail','review'].includes(mode);
  $('question-view').hidden=mode!=='detail';$('review-view').hidden=mode!=='review';
  $('change-start').hidden=mode!=='town';$('scene-controls').hidden=mode!=='town';$('scene-wrap').querySelector('.scene-heading').hidden=['detail','review'].includes(mode);
- $('location-title').textContent=draft.entry==='discover'?'어느 생활권에서 찾을까?':draft.entry==='single'?'어느 집을 분석할까?':'어느 집들을 비교할까?';
+ $('location-title').textContent=draft.entry==='discover'?'관심 지역':draft.entry==='single'?'집 선택':'비교할 집';
  $('discover-location').hidden=draft.entry!=='discover';$('known-location').hidden=draft.entry==='discover';
- $('enter-town').disabled=!entryReady(draft);$('enter-town').firstChild.textContent=draft.entry==='discover'?'내 마을 만들기':draft.entry==='single'?'이 집으로 마을 만들기':'이 집들로 마을 만들기';
+ $('enter-town').disabled=!entryReady(draft);$('enter-town').firstChild.textContent='다음';
  $('location-input').value=draft.location;
  renderEntryPlaces();
  const percentages=shares(draft.blocks);
@@ -74,15 +75,15 @@ function render(){
   $('question-prev').hidden=step===0;$('question-next-label').textContent=step===order.length-1?'입력 확인':'다음';
  }else if(mode==='review'){
   $('question-progress').textContent=`${order.length}/${order.length}`;$('answer-summary').replaceChildren();
-  for(const id of order){const c=CATEGORIES.find(c=>c.id===id),row=document.createElement('div');row.className='answer-item';const name=document.createElement('strong'),percent=document.createElement('span'),answer=document.createElement('p');name.textContent=c.label;percent.textContent=id==='housing'?'참고':percentages[id]+'%';name.append(percent);answer.textContent=draft.answers[id]?.trim()||'아직 모르겠어';row.append(name,answer);$('answer-summary').append(row);}
+  for(const id of order){const c=CATEGORIES.find(c=>c.id===id),row=document.createElement('div');row.className='answer-item';const name=document.createElement('strong'),percent=document.createElement('span'),answer=document.createElement('p');name.textContent=c.label;percent.textContent=id==='housing'?'참고':percentages[id]+'%';name.append(percent);answer.textContent=draft.answers[id]?.trim()||'나중에 정할게요';row.append(name,answer);$('answer-summary').append(row);}
  }
  world?.present({mode,focus:mode==='detail'?draft.focus:null});world?.sync();expose();
 }
-document.querySelectorAll('[data-entry]').forEach(b=>b.addEventListener('click',()=>{draft.entry=b.dataset.entry;draft.handoff=false;locationVersion++;pendingPlace=null;$('map-pick').hidden=true;$('address-results').replaceChildren();$('location-error').hidden=true;mode='location';save();render();debugEvent('entry_selected',{entry:draft.entry});if(draft.entry!=='discover')loadEntryMap();}));
+document.querySelectorAll('[data-entry]').forEach(b=>b.addEventListener('click',()=>{draft.entry=b.dataset.entry;draft.handoff=false;locationVersion++;pendingPlace=null;$('map-pick').hidden=true;$('address-results').replaceChildren();$('address-status').textContent='';$('location-error').hidden=true;mode='location';save();render();debugEvent('entry_selected',{entry:draft.entry});if(draft.entry!=='discover')loadEntryMap();}));
 $('location-input').addEventListener('input',event=>{draft.location=event.target.value.slice(0,200);save();});
 $('location-back').addEventListener('click',()=>{locationVersion++;mode='start';render();});
 $('change-start').addEventListener('click',()=>{mode='start';world?.cancelDrag();render();});
-$('enter-town').addEventListener('click',()=>{if(mode!=='location'||!entryReady(draft))return;locationVersion++;mode='town';save();render();debugEvent('candidates_confirmed',{entry:draft.entry,location:draft.entry==='discover'?draft.location:null,candidates:draft.entry==='discover'?[]:draft.candidates});status(draft.blocks.length?'':'블록을 골라 집 주변에 놓아봐.');});
+$('enter-town').addEventListener('click',()=>{if(mode!=='location'||!entryReady(draft))return;locationVersion++;mode='town';save();render();debugEvent('candidates_confirmed',{entry:draft.entry,location:draft.entry==='discover'?draft.location:null,candidates:draft.entry==='discover'?[]:draft.candidates});status(draft.blocks.length?'':'블록을 집 주변에 놓아주세요.');});
 $('open-details').addEventListener('click',()=>{if(mode!=='town'||!draft.blocks.length||!world?.available)return;world.cancelDrag();order=draft.blocks.slice().sort((a,b)=>levelForPosition(a.x,a.z)-levelForPosition(b.x,b.z)).map(b=>b.id);step=0;mode='detail';save();status('');render();window.scrollTo(0,0);});
 $('back-town').addEventListener('click',()=>{mode='town';render();window.scrollTo(0,0);});
 $('category-answer').addEventListener('input',event=>{draft.answers[order[step]]=event.target.value.slice(0,450);draft.handoff=false;save();});
@@ -101,9 +102,9 @@ function locationError(message){$('location-error').textContent=message;$('locat
 function renderEntryPlaces(){
  $('entry-place-list').replaceChildren();for(const [i,p] of draft.candidates.entries()){
   const row=document.createElement('li'),name=document.createElement('span'),remove=document.createElement('button');name.textContent=`${i+1}. ${p.label}`;remove.type='button';remove.setAttribute('aria-label',p.label+' 삭제');remove.append(icon('remove'));remove.addEventListener('click',()=>{draft.candidates=draft.candidates.filter(x=>x.id!==p.id);draft.handoff=false;save();debugEvent('candidates_confirmed',{operation:'removed',entry:draft.entry,candidates:draft.candidates,ready:entryReady(draft)});render();drawEntryMap();});row.append(name,remove);$('entry-place-list').append(row);
- }$('entry-place-count').textContent=draft.entry==='single'?'집 1곳을 선택해 줘.':`${draft.candidates.length}곳 선택 · 2~6곳 비교`;
+ }$('entry-place-count').textContent=draft.entry==='single'?'':`${draft.candidates.length}/6`;
 }
-function selectEntryPlace(place){try{addCandidate(draft,{id:'home_'+crypto.randomUUID().replaceAll('-',''),...place,origin:'user'});locationError('');pendingPlace=null;$('map-pick').hidden=true;$('address-results').replaceChildren();save();debugEvent('candidates_confirmed',{operation:'selected',entry:draft.entry,candidates:draft.candidates,ready:entryReady(draft)});render();drawEntryMap(true);}catch(e){locationError(e.message);}}
+function selectEntryPlace(place){try{addCandidate(draft,{id:'home_'+crypto.randomUUID().replaceAll('-',''),...place,origin:'user'});locationError('');pendingPlace=null;$('map-pick').hidden=true;$('address-results').replaceChildren();$('address-status').textContent='';save();debugEvent('candidates_confirmed',{operation:'selected',entry:draft.entry,candidates:draft.candidates,ready:entryReady(draft)});render();drawEntryMap(true);}catch(e){locationError(e.message);}}
 function drawEntryMap(fit=false){
  if(!entryMap)return;markers.forEach(m=>m.setMap(null));markers=[];const bounds=new kakao.maps.LatLngBounds();
  for(const p of [...draft.candidates,...(pendingPlace?[pendingPlace]:[])]){const position=new kakao.maps.LatLng(p.latitude,p.longitude);bounds.extend(position);markers.push(new kakao.maps.Marker({map:entryMap,position}));}
@@ -112,32 +113,32 @@ function drawEntryMap(fit=false){
 async function loadEntryMap(){
  if(entryMap){requestAnimationFrame(()=>{entryMap.relayout();drawEntryMap(true);});return;}
  if(entryMapLoading)return entryMapLoading;
- entryMapLoading=(async()=>{let stage='config';try{
-  const response=await fetch('/api/config');if(!response.ok)throw new Error();const config=await response.json();if(!config.javascriptKey)throw new Error();
-  stage='sdk-script';await new Promise((resolve,reject)=>{const script=document.createElement('script'),timer=setTimeout(reject,15000);script.src=`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(config.javascriptKey)}&autoload=false&libraries=services`;script.onload=()=>{clearTimeout(timer);resolve();};script.onerror=()=>{clearTimeout(timer);reject();};document.head.append(script);});
-  stage='sdk-load';await new Promise((resolve,reject)=>{const timer=setTimeout(reject,15000);kakao.maps.load(()=>{clearTimeout(timer);resolve();});});
-  stage='map';entryMap=new kakao.maps.Map($('entry-map'),{center:new kakao.maps.LatLng(35.1796,128.1076),level:7});stage='geocoder';geocoder=new kakao.maps.services.Geocoder();$('entry-map-fallback').hidden=true;
-  kakao.maps.event.addListener(entryMap,'click',event=>{
+ $('entry-map-state').hidden=false;$('entry-map-fallback').textContent='지도 로딩 중';$('entry-map-retry').hidden=true;
+ entryMapLoading=(async()=>{let stage='sdk';try{
+  const maps=await loadKakaoMaps();stage='map';
+  entryMap=new maps.Map($('entry-map'),{center:new maps.LatLng(35.1796,128.1076),level:7});
+  geocoder=new maps.services.Geocoder();$('entry-map-state').hidden=true;$('address-status').textContent='';
+  maps.event.addListener(entryMap,'click',event=>{
    if(mode!=='location'||draft.entry==='discover')return;const version=++locationVersion;
-   pendingPlace={label:'지도에서 고른 집',latitude:event.latLng.getLat(),longitude:event.latLng.getLng()};$('map-pick-label').textContent=pendingPlace.label;$('map-pick').hidden=false;drawEntryMap();
-   geocoder.coord2Address(pendingPlace.longitude,pendingPlace.latitude,(results,status)=>{if(version!==locationVersion||!pendingPlace)return;if(status===kakao.maps.services.Status.OK&&results[0]){pendingPlace.label=results[0].road_address?.address_name||results[0].address?.address_name||pendingPlace.label;$('map-pick-label').textContent=pendingPlace.label;}});
-  });new ResizeObserver(()=>{const center=entryMap.getCenter();entryMap.relayout();entryMap.setCenter(center);}).observe($('entry-map'));drawEntryMap(true);
- }catch(error){entryMap=null;geocoder=null;$('entry-map-fallback').dataset.failureStage=stage;debugEvent('analysis_error',{phase:'entry_map',stage,error_name:error?.name||'load_failed'});$('entry-map-fallback').textContent='지도를 불러오지 못했어. 좌표로 집을 선택할 수 있어.';$('address-status').textContent='주소 검색을 사용할 수 없어. 좌표 입력을 사용해 줘.';$('entry-coordinate').open=true;}
+   pendingPlace={label:'지도에서 선택한 집',latitude:event.latLng.getLat(),longitude:event.latLng.getLng()};$('map-pick-label').textContent=pendingPlace.label;$('map-pick').hidden=false;drawEntryMap();
+   geocoder.coord2Address(pendingPlace.longitude,pendingPlace.latitude,(results,status)=>{if(version!==locationVersion||!pendingPlace)return;if(status===maps.services.Status.OK&&results[0]){pendingPlace.label=results[0].road_address?.address_name||results[0].address?.address_name||pendingPlace.label;$('map-pick-label').textContent=pendingPlace.label;}});
+  });new ResizeObserver(()=>{if(!entryMap)return;const center=entryMap.getCenter();entryMap.relayout();if(draft.candidates.length>1)drawEntryMap(true);else entryMap.setCenter(center);}).observe($('entry-map'));drawEntryMap(true);
+ }catch(error){entryMap=null;geocoder=null;const failedStage=error?.stage||stage;$('entry-map-fallback').dataset.failureStage=failedStage;debugEvent('analysis_error',{phase:'entry_map',stage:failedStage,error_name:error?.name||'load_failed'});$('entry-map-fallback').textContent='지도를 불러오지 못했어요.';$('entry-map-state').hidden=false;$('entry-map-retry').hidden=false;}
  finally{entryMapLoading=null;}})();return entryMapLoading;
 }
+$('entry-map-retry').addEventListener('click',loadEntryMap);
 $('address-form').addEventListener('submit',async event=>{
  event.preventDefault();const query=$('address-input').value.trim();if(!query)return;await loadEntryMap();if(!geocoder)return;
- const version=++locationVersion;$('address-status').textContent='주소를 찾고 있어.';$('address-results').replaceChildren();$('address-search').disabled=true;
- const timer=setTimeout(()=>{if(version!==locationVersion)return;locationVersion++;$('address-search').disabled=false;$('address-status').textContent='주소 검색이 지연되고 있어. 다시 검색하거나 지도에서 골라줘.';},15000);
+ const version=++locationVersion;$('address-status').textContent='주소 검색 중';$('address-results').replaceChildren();$('address-search').disabled=true;
+ const timer=setTimeout(()=>{if(version!==locationVersion)return;locationVersion++;$('address-search').disabled=false;$('address-status').textContent='검색이 지연되고 있어요. 다시 검색해 주세요.';},15000);
  geocoder.addressSearch(query,(results,status)=>{
   clearTimeout(timer);if(version!==locationVersion){$('address-search').disabled=false;return;}$('address-search').disabled=false;
-  if(status!==kakao.maps.services.Status.OK||!results.length){$('address-status').textContent='주소를 찾지 못했어. 도로명·지번 주소를 확인하거나 지도에서 골라줘.';return;}
-  $('address-status').textContent='분석할 집의 주소를 선택해 줘.';
+  if(status!==kakao.maps.services.Status.OK||!results.length){$('address-status').textContent='검색 결과가 없어요. 주소를 확인해 주세요.';return;}
+  $('address-status').textContent='';
   for(const result of results.slice(0,6)){const place={label:result.road_address?.address_name||result.address_name,latitude:Number(result.y),longitude:Number(result.x)},button=document.createElement('button');button.type='button';button.textContent=place.label;button.addEventListener('click',()=>selectEntryPlace(place));$('address-results').append(button);}
  },{size:6});
 });
 $('confirm-map-pick').addEventListener('click',()=>{if(pendingPlace){locationVersion++;selectEntryPlace(pendingPlace);}});
-$('coordinate-form').addEventListener('submit',event=>{event.preventDefault();if(!$('coordinate-lat').value||!$('coordinate-lon').value)return;locationVersion++;selectEntryPlace({label:$('coordinate-name').value.trim()||'좌표로 고른 집',latitude:Number($('coordinate-lat').value),longitude:Number($('coordinate-lon').value)});});
 
 try{
  const THREE=await import('./vendor/three/three.module.min.js');

@@ -10,9 +10,9 @@ export function readCandidates(value){
 export function samePlace(a,b){return Math.abs(a.latitude-b.latitude)<.00001&&Math.abs(a.longitude-b.longitude)<.00001;}
 export function entryReady(draft){const count=readCandidates(draft.candidates).length;return draft.entry==='discover'||(draft.entry==='single'?count===1:draft.entry==='multiple'&&count>=2&&count<=6);}
 export function addCandidate(draft,place){
- const next=readCandidates([place])[0];if(!next)throw new Error('유효한 집 위치를 골라줘.');
- if(draft.candidates.some(p=>samePlace(p,next)))throw new Error('이미 고른 집이야.');
+ const next=readCandidates([place])[0];if(!next)throw new Error('집 위치를 확인해 주세요.');
+ if(draft.candidates.some(p=>samePlace(p,next)))throw new Error('이미 선택한 집이에요.');
  if(draft.entry==='single')draft.candidates=[next];
- else{if(draft.candidates.length>=6)throw new Error('최대 6곳까지 비교할 수 있어.');draft.candidates.push(next);}
+ else{if(draft.candidates.length>=6)throw new Error('최대 6곳까지 비교할 수 있어요.');draft.candidates.push(next);}
  draft.handoff=false;
 }

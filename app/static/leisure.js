@@ -5,7 +5,7 @@ function updateLeisureControls(){
   $('leisure-cancel').hidden=!reviewState.job||!state.run?.leisure_research_scope;
 }
 function initLeisure(data){
-  $('leisure-data-note').textContent=`등록 공원 ${data.counts.park}곳 · 도서관 ${data.counts.library}곳. 1년이 지났거나 미래인 공원 ${data.stale_or_future.park}곳 · 도서관 ${data.stale_or_future.library}곳. 오래된 자료가 있으면 최단거리 점수를 유보해. 사설 시설은 상가 목록과 웹검색으로 보완해.`;
+  $('leisure-data-note').textContent=`등록 공원 ${data.counts.park}곳 · 도서관 ${data.counts.library}곳. 1년이 지났거나 미래인 공원 ${data.stale_or_future.park}곳 · 도서관 ${data.stale_or_future.library}곳. 오래된 자료가 있으면 최단거리 점수를 유보해. 사설 시설은 상가 목록과 웹검색으로 보완해요.`;
 }
 function renderLeisureProfile(){
   resetEdits('leisure-form');
@@ -36,9 +36,9 @@ function appendLeisureDetails(card,candidateId){
     if(detail.candidate_id!==candidateId)continue;
     const box=node('details');box.append(node('summary',detail.activity?'취미 시설 후보 · 점수 제외':'여가 시설과 확인 범위'));
     if(detail.activity){
-      box.append(node('p',`${detail.activity_name||leisureActivities[detail.activity]||detail.activity} · ${detail.activity_form||'이용 형태 미지정'}. 등록 업종 후보이며 실제 형태는 웹 보완에서 확인해.`,'hint'));
+      box.append(node('p',`${detail.activity_name||leisureActivities[detail.activity]||detail.activity} · ${detail.activity_form||'이용 형태 미지정'}. 등록 업종 후보이며 실제 형태는 웹 보완에서 확인해요.`,'hint'));
       for(const r of detail.registered_leads)box.append(node('strong',r.name),node('p',`${r.address} · ${Math.round(r.distance_m)}m 직선거리`),node('p',`등록 업종 ${r.detail} · 자료 기준 ${r.date}`,'hint'));
-      if(!detail.registered_leads.length)box.append(node('p','등록 목록에서 후보를 찾지 못했어. 시설이 없다는 뜻은 아니야.','unknown'));
+      if(!detail.registered_leads.length)box.append(node('p','등록 목록에서 후보를 찾지 못했어요. 시설이 없다는 뜻은 아니에요.','unknown'));
     }else{
       box.append(node('p',detail.note));
       for(const r of detail.selected){
@@ -61,18 +61,18 @@ function renderLeisure(){
     for(const item of result.discoveries){
       const card=node('article',undefined,'review-card');
       card.append(node('h3',item.name),node('p',item.address),node('p',`${leisureActivities[item.activity]} · ${item.role_label}`,'hint'),reviewLink('시설 원문 보기',item.source_url),node('p',item.note,'hint'));
-      if(item.registered_id)card.append(node('p','공공 상가 목록의 같은 상호·도로명주소와 연결했어. 이용 형태와 점수는 별도야.','hint'));
+      if(item.registered_id)card.append(node('p','공공 상가 목록의 같은 상호·도로명주소와 연결했어요. 이용 형태와 점수는 별도야.','hint'));
       for(const e of item.excerpts)card.append(node('blockquote',e.quote),node('p','AI 해석: '+e.interpretation),node('p','작성 '+e.published_date,'hint'));
       $('leisure-research-result').append(card);
     }
-    $('leisure-status').textContent=result.discoveries.length?`출처를 대조한 발견 후보 ${result.discoveries.length}곳. 전체 시설 수가 아니며 점수·필수조건에는 반영하지 않았어.`:'이번 웹검색에서 원문·지점·종목을 확인한 보완 자료를 찾지 못했어. 등록 후보를 참고하고 이용 형태는 미확인으로 남겨.';
-  }else if(reviewState.cancelled)$('leisure-status').textContent='취미 보완 조사를 취소했어. 등록 후보와 미확인 조건을 유지했어.';
-  else if(reviewState.result?.errors?.some(e=>e.module==='leisure')||reviewState.requested&&!reviewState.job)$('leisure-status').textContent='취미 웹 조사를 완료하지 못했어. 등록 후보와 미확인 조건을 유지했어.';
-  else $('leisure-status').textContent=state.run.leisure_research_scope?'요청한 종목의 사설 시설 후보와 이용 형태를 웹으로 조사해.':'사설 취미를 선택하면 후보 발굴과 웹 보완이 이어져. 이용 조건이 미확인이면 전체 순위는 보류해.';
+    $('leisure-status').textContent=result.discoveries.length?`출처를 대조한 발견 후보 ${result.discoveries.length}곳. 전체 시설 수가 아니며 점수·필수조건에는 반영하지 않았어요.`:'이번 웹검색에서 원문·지점·종목을 확인한 보완 자료를 찾지 못했어요. 등록 후보를 참고하고 이용 형태는 미확인으로 남겨.';
+  }else if(reviewState.cancelled)$('leisure-status').textContent='취미 보완 조사를 취소했어요. 등록 후보와 미확인 조건을 유지했어요.';
+  else if(reviewState.result?.errors?.some(e=>e.module==='leisure')||reviewState.requested&&!reviewState.job)$('leisure-status').textContent='취미 웹 조사를 완료하지 못했어요. 등록 후보와 미확인 조건을 유지했어요.';
+  else $('leisure-status').textContent=state.run.leisure_research_scope?'요청한 종목의 사설 시설 후보와 이용 형태를 웹으로 조사해.':'사설 취미를 선택하면 후보 발굴과 웹 보완이 이어져. 이용 조건이 미확인이면 전체 순위는 보류해요.';
   updateLeisureControls();
 }
 watchEdits('leisure-form',{'include-park':'include_park','park-type':'park_type','include-library':'include_library','library-type':'library_type','leisure-ideal':'ideal','leisure-limit':'limit','park-importance':'park_importance','library-importance':'library_importance','include-meeting':'include_meeting','meeting-label':'meeting_label','meeting-lat':'meeting_latitude','meeting-lon':'meeting_longitude','meeting-importance':'meeting_importance','include-hobby':'include_hobby','hobby-activity':'activity','hobby-name':'activity_name','hobby-form':'activity_form','hobby-importance':'hobby_importance','leisure-weight':'group_weight'});
-$('leisure-form').addEventListener('input',()=>{state.leisureDirty=true;updateCompare();notice('여가 조건을 수정했어. 조건 적용을 누르면 반영돼.');});
+$('leisure-form').addEventListener('input',()=>{state.leisureDirty=true;updateCompare();notice('여가 조건을 수정했어요. 조건 적용을 누르면 반영돼요.');});
 $('leisure-form').addEventListener('submit',async event=>{
   event.preventDefault();if(state.busy)return;
   let profile=null;
@@ -85,7 +85,7 @@ $('leisure-form').addEventListener('submit',async event=>{
       include_meeting:$('include-meeting').checked,meeting_label:$('meeting-label').value.trim(),
       meeting_latitude:$('meeting-lat').value===''?null:Number($('meeting-lat').value),meeting_longitude:$('meeting-lon').value===''?null:Number($('meeting-lon').value),meeting_importance:Number($('meeting-importance').value),
       include_hobby:$('include-hobby').checked,activity:$('hobby-activity').value,activity_name:$('hobby-name').value.trim(),activity_form:$('hobby-form').value.trim(),hobby_importance:Number($('hobby-importance').value),group_weight:Number($('leisure-weight').value)});
-    setProfile(result.profile);notice('여가 조건을 반영했어. 사설 취미를 선택했으면 비교 뒤 웹 보완이 이어져.');
+    setProfile(result.profile);notice('여가 조건을 반영했어요. 사설 취미를 선택했으면 비교 뒤 웹 보완이 이어져.');
   }catch(error){notice(error.message,true);}finally{busy(false);}
 });
-$('leisure-cancel').addEventListener('click',()=>{$('reviews-cancel').click();$('leisure-status').textContent='취미 보완 조사 취소를 요청했어.';});
+$('leisure-cancel').addEventListener('click',()=>{$('reviews-cancel').click();$('leisure-status').textContent='취미 보완 조사 취소를 요청했어요.';});

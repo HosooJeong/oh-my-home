@@ -1,0 +1,7 @@
+@font-face{font-family:'SUIT';font-style:normal;font-weight:100 900;font-display:swap;src:url('/vendor/fonts/SUIT-Variable.woff2') format('woff2')}
+@font-face{font-family:'SUITE';font-style:normal;font-weight:300 900;font-display:swap;src:url('/vendor/fonts/SUITE-Variable.woff2') format('woff2')}
+:root{--font-body:'SUIT',system-ui,'Malgun Gothic',sans-serif;--font-display:'SUITE','SUIT',system-ui,sans-serif;font-family:var(--font-body);font-synthesis:none;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased}
+body,input,textarea,select,button{font-family:var(--font-body)}
+h1,h2,h3,.brand{font-family:var(--font-display);font-weight:650;letter-spacing:-.025em;word-break:keep-all}
+body{letter-spacing:-.015em}p{line-height:1.65;word-break:keep-all;overflow-wrap:anywhere}button{font-weight:600}input,textarea{font-weight:400}
+[role=status]:empty,.quiet:empty,.location-note:empty{display:none}

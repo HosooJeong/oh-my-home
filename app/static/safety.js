@@ -7,7 +7,7 @@ function safetyContextText(fact) {
 function initSafety(data) {
   $('safety-data-note').textContent = data.available
     ? `CCTV 등록 ${data.registered_rows.toLocaleString()}행 · 서로 다른 좌표 ${data.coordinate_points.toLocaleString()}지점. 공개본 수정 ${data.publication_date}. 좌표 오류 분리 ${data.excluded_coordinate_rows ?? '미확인'}행. 작동 여부·실제 안전도는 미확인.`
-    : 'CCTV 자료 또는 후보의 행정경계가 준비되지 않았어. 문제별 니즈는 보존해.';
+    : 'CCTV 자료 또는 후보의 행정경계가 준비되지 않았어요. 문제별 니즈는 보존해요.';
 }
 function updateSafetyControls() {
   $('safety-fields').disabled = state.busy;
@@ -42,8 +42,8 @@ function renderSafety() {
       box.append(node('p',`${o.area_name} · 반경 내 등록 ${o.registered_rows_within_radius}행 / 좌표 ${o.registered_coordinate_points_within_radius}지점 · 최근접 ${Math.round(o.nearest_distance_m)}m`));
       box.append(node('p',`등록 목적: ${o.purposes_within_radius.join(', ') || '반경 내 확인된 지점 없음'}`,'hint'));
       box.append(node('p',`최근접 원본 행: ${o.nearest_source_records.join(', ')}`,'hint'));
-      if (o.status==='stale') box.append(node('p','공개본 수정일이 1년을 넘은 과거 등록 참고야. 현재 상태는 미확인.','unknown'));
-    } else box.append(node('p',o.status==='outside_scope'?'준비된 진주 읍면동 경계 밖이라 연결하지 않았어.':'자료 또는 경계를 확인할 수 없어.','unknown'));
+      if (o.status==='stale') box.append(node('p','공개본 수정일이 1년을 넘은 과거 등록 참고예요. 현재 상태는 미확인.','unknown'));
+    } else box.append(node('p',o.status==='outside_scope'?'준비된 진주 읍면동 경계 밖이라 연결하지 않았어요.':'자료 또는 경계를 확인할 수 없어요.','unknown'));
     $('safety-reference').append(box);
   }
   const details=node('details'); details.append(node('summary','등록 자료의 해석과 누락'));
@@ -58,19 +58,19 @@ function renderSafety() {
       if (item.unconfirmed_topics.length) box.append(node('p','확인할 근거를 찾지 못한 문제: '+item.unconfirmed_topics.map(k=>safetyTopics[k]).join(', '),'unknown'));
       $('safety-research-result').append(box);
     }
-    $('safety-status').textContent=`지역 보완 조사 완료 · ${new Date(research.checked_at).toLocaleString('ko-KR')}. 찾지 못한 자료는 미확인이며, 안전·위험 판정이나 점수에 반영하지 않았어.`;
-  } else if (reviewState.result?.errors?.some(e=>e.module==='safety')) $('safety-status').textContent='지역 보완 조사를 완료하지 못했어. 문제별 근거는 미확인으로 남겼어.';
-  else if (state.run.safety_research_status) $('safety-status').textContent='조사할 문제나 공식 행정동 범위를 확인할 수 없어 보완을 실행하지 않았어.';
-  else if (state.run.research_status==='busy') $('safety-status').textContent='다른 AI 작업 때문에 보완을 시작하지 못했어. 작업 종료 후 비교를 새로 실행해 줘.';
-  else if ((state.run.safety_research_scope || []).length) $('safety-status').textContent='최신 공식 지역자료를 조사하고 있어.';
-  else $('safety-status').textContent='추가 웹 조사를 요청하지 않았어. 등록 정보만 참고해.';
+    $('safety-status').textContent=`지역 보완 조사 완료 · ${new Date(research.checked_at).toLocaleString('ko-KR')}. 찾지 못한 자료는 미확인이며, 안전·위험 판정이나 점수에 반영하지 않았어요.`;
+  } else if (reviewState.result?.errors?.some(e=>e.module==='safety')) $('safety-status').textContent='지역 보완 조사를 완료하지 못했어요. 문제별 근거는 미확인으로 남겼어.';
+  else if (state.run.safety_research_status) $('safety-status').textContent='조사할 문제나 공식 행정동 범위를 확인할 수 없어 보완을 실행하지 않았어요.';
+  else if (state.run.research_status==='busy') $('safety-status').textContent='다른 AI 작업 때문에 보완을 시작하지 못했어요. 작업 종료 후 비교를 새로 실행해 주세요.';
+  else if ((state.run.safety_research_scope || []).length) $('safety-status').textContent='최신 공식 지역자료를 조사하고 있어요.';
+  else $('safety-status').textContent='추가 웹 조사를 요청하지 않았어요. 등록 정보만 참고해요.';
   const searched = new Set((state.run.safety_research_scope || []).map(t=>t.area_code));
   const remaining = [...new Set(ref.observations.filter(o=>o.area_code&&!searched.has(o.area_code)).map(o=>o.area_name))];
   if (searched.size) $('safety-research-result').append(node('p','조사 범위: '+state.run.safety_research_scope.map(t=>t.area_name).join(', ')+'. 진주시청 공개 게시글, 최대 3개 지역.'+(remaining.length?' 이번에 조사하지 않은 지역: '+remaining.join(', '):''),'hint'));
   updateSafetyControls();
 }
 watchEdits('safety-form',{'safety-topic':'topics','safety-weight':'group_weight','safety-importance':'criterion_importance','safety-radius':'radius_m','safety-research':'qualitative_research'});
-$('safety-form').addEventListener('input',()=>{state.safetyDirty=true;updateCompare();notice('안전·환경 조건을 수정했어. 조건 적용을 누르면 반영돼.');});
+$('safety-form').addEventListener('input',()=>{state.safetyDirty=true;updateCompare();notice('안전·환경 조건을 수정했어요. 조건 적용을 누르면 반영돼요.');});
 $('safety-form').addEventListener('submit',async event=>{
   event.preventDefault(); if(state.busy)return;busy(true);
   try {
@@ -78,7 +78,7 @@ $('safety-form').addEventListener('submit',async event=>{
       topics:[...document.querySelectorAll('[name="safety-topic"]:checked')].map(i=>i.value),
       group_weight:Number($('safety-weight').value),criterion_importance:Number($('safety-importance').value),
       radius_m:Number($('safety-radius').value),qualitative_research:$('safety-research').checked});
-    setProfile(result.profile);notice('안전·환경 니즈를 반영했어. 중요도와 후보를 확인해 줘.');
+    setProfile(result.profile);notice('안전·환경 니즈를 반영했어요. 중요도와 후보를 확인해 주세요.');
   }catch(error){notice(error.message,true);}finally{busy(false);}
 });
-$('safety-cancel').addEventListener('click',()=>{$('reviews-cancel').click();setSafetyStatus('보완 조사 취소를 요청했어.');});
+$('safety-cancel').addEventListener('click',()=>{$('reviews-cancel').click();setSafetyStatus('보완 조사 취소를 요청했어요.');});

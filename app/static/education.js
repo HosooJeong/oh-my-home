@@ -10,8 +10,8 @@ function educationContextText(fact) {
 function updateEducationControls() { $('education-fields').disabled = state.busy; }
 function initEducation(data) {
   $('education-data-note').textContent = data.available
-    ? `진주 학교 ${data.counts.school}곳 · 학원 ${data.counts.academy}개소. 학원 위치 미연결 ${data.academy_unlocated}개소, 연계일이 오래됐거나 미래인 자료 ${data.academy_old_or_future}개소. 위치·학령·자료 시점이 빠진 경우 전체 개소와 점수는 미확인이야.`
-    : '교육 자료가 준비되지 않았어. 조건은 보존하고 결과는 미확인으로 남겨.';
+    ? `진주 학교 ${data.counts.school}곳 · 학원 ${data.counts.academy}개소. 학원 위치 미연결 ${data.academy_unlocated}개소, 연계일이 오래됐거나 미래인 자료 ${data.academy_old_or_future}개소. 위치·학령·자료 시점이 빠진 경우 전체 개소와 점수는 미확인이에요.`
+    : '교육 자료가 준비되지 않았어요. 조건은 보존하고 결과는 미확인으로 남겨.';
 }
 function renderEducationProfile() {
   resetEdits('education-form');
@@ -35,7 +35,7 @@ function renderEducationProfile() {
   $('education-research').checked = p.context.some(c => c.key === 'education_research' && c.value === 'requested');
 }
 watchEdits('education-form',{'school-level':'school_level','school-travel':'travel_mode','include-school':'include_school','school-ideal':'school_ideal','school-limit':'school_limit','school-importance':'school_importance','include-academy':'include_academy','academy-subject':'subject','academy-radius':'radius_m','academy-sufficient':'sufficient_count','academy-importance':'academy_importance','education-weight':'group_weight','education-research':'qualitative_research'});
-$('education-form').addEventListener('input', () => {state.educationDirty = true; updateCompare(); notice('교육 조건을 수정했어. 교육 조건 적용을 누르면 반영돼.');});
+$('education-form').addEventListener('input', () => {state.educationDirty = true; updateCompare(); notice('교육 조건을 수정했어요. 교육 조건 적용을 누르면 반영돼요.');});
 $('education-form').addEventListener('submit', async event => {
   event.preventDefault(); if (state.busy) return;
   let profile = null;
@@ -50,7 +50,7 @@ $('education-form').addEventListener('submit', async event => {
       subject:$('academy-subject').value, radius_m:Number($('academy-radius').value), sufficient_count:Number($('academy-sufficient').value),
       academy_importance:Number($('academy-importance').value), group_weight:Number($('education-weight').value),
       qualitative_research:$('education-research').checked});
-    setProfile(result.profile); notice('교육 조건을 반영했어. 후보를 비교하면 필요한 웹 보완 조사도 이어서 실행돼.');
+    setProfile(result.profile); notice('교육 조건을 반영했어요. 후보를 비교하면 필요한 웹 보완 조사도 이어서 실행돼요.');
   } catch(error) {notice(error.message,true);} finally {busy(false);}
 });
 function appendEducationDetails(card, candidateId) {
