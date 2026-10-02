@@ -18,7 +18,7 @@ TARGETS = {
     'meeting_straight_line_distance_m': r'모임|만남|지점',
 }
 SUBJECT = re.compile(r'마트|슈퍼|편의점|정류장|학교|학원|교습소|공원|도서관|필라테스|헬스|탁구|수영|가족\s*모임')
-QUALIFIER = re.compile(r'비중|중요도|두\s*조건|거리|기준|이내|이상|이하|필수|상관\s*없|유형')
+QUALIFIER = re.compile(r'비중|중요|두\s*(?:조건|곳)|둘|접근성|비슷|동일|거리|기준|이내|이상|이하|필수|상관\s*없|유형')
 MANDATORY = re.compile(r'필수|반드시|무조건|해야|여야|넘지\s*않')
 NUMBER = r'[-+]?\d+(?:,\d{3})*(?:\.\d+)?'
 
@@ -208,7 +208,7 @@ def bind_fields(doc, sources, needs, previous=None, answers=()):
                     checks.append(('utility', quotes))
                 else:
                     fields['utility'] = quotes
-            if c['importance_source'] == 'user' or 'importance' in fields:
+            if c['importance_source'] == 'user':
                 quotes = fields.get('importance', []) or primary
                 values = set().union(*(importance_values(t, c, criteria, sources) for t in quotes))
                 excluded = c['importance'] == 0 and any(re.search(r'제외|필요\s*없|상관\s*없', t) for t in quotes)
@@ -227,7 +227,8 @@ def bind_fields(doc, sources, needs, previous=None, answers=()):
                 else:
                     fields['hard'] = quotes
             if c['parameters']:
-                quotes=fields.get('parameters',[]) or primary
+                # A school-level answer refines, rather than replaces, the original subject.
+                quotes=list(dict.fromkeys([*primary,*fields.get('parameters',[])]))
                 if not parameters_grounded(c['parameters'],' '.join(quotes)):
                     checks.append(('parameters',quotes))
                 else:

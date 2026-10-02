@@ -52,6 +52,13 @@ class HardRule(Contract):
     value: Number
 
 
+class ComparisonProposal(Contract):
+    """App-owned comparison scale; never an explicit user limit or observed fact."""
+    label: Text
+    utility: UtilityRule
+    radius_m: Number | None
+
+
 class MetricParameters(TypedDict, total=False):
     school_level: Annotated[str, Field(max_length=200)] | None
     school_id: Annotated[str, Field(max_length=200)] | None
@@ -87,10 +94,12 @@ class Criterion(Contract):
     source: Literal["user", "proposed"]
     importance: Weight
     importance_source: Literal["user", "proposed"]
+    importance_proposal: Weight | None = None
     metric: Identifier
     utility: UtilityRule | None
     hard: HardRule | None
     parameters: MetricParameters = Field(default_factory=dict)
+    comparison_proposal: ComparisonProposal | None = None
 
     @field_validator('parameters')
     @classmethod
@@ -112,6 +121,7 @@ class Question(Contract):
     reason: Text
     criterion_ids: list[Identifier]
     blocking: bool
+    choices: Annotated[list[Annotated[str, Field(min_length=1, max_length=160)]], Field(max_length=3)] = Field(default_factory=list)
 
 
 class ContextFact(Contract):

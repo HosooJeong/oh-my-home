@@ -22,18 +22,24 @@ export function hardLabel(criterion){
  const text=unit==='m'?value.toLocaleString('ko-KR')+'m':measure(value,unit);
  return '필수 · '+text+' '+({lte:'이하',gte:'이상',eq:'일치'}[criterion.hard.operator]||'확인 필요');
 }
-export function utilityLabel(criterion){
+export function proposedComparison(criterion){
+ const p=criterion.comparison_proposal,u=criterion.utility;
+ return !!(p&&u&&!criterion.hard&&['direction','ideal','limit','unit'].every(k=>p.utility[k]===u[k])&&(p.radius_m===null||Number(criterion.parameters?.radius_m)===p.radius_m));
+}
+export function utilityLabel(criterion,detailed=false){
  if(criterion.module_id==='housing')return '집별 가격·예산 충족은 미확인';
  const u=criterion.utility;if(!u||u.unit==='bool')return '현재 정량 근거 미확인';
- const value=n=>measure(n,u.unit).replace(' · 직선거리','').replace(' · 등록자료',''),prefix=u.unit==='m'?'직선거리 ':u.unit==='count'?'등록 개소 ':'';
+ const proposed=proposedComparison(criterion);
+ if(proposed&&!detailed)return criterion.comparison_proposal.label+' · 비교 기준 제안';
+ const value=n=>measure(n,u.unit).replace(' · 직선거리','').replace(' · 등록자료',''),prefix=(proposed?'서비스 제안 · ':'')+(u.unit==='m'?'직선거리 ':u.unit==='count'?'등록 개소 ':'');
  if(u.direction==='target')return '목표 '+value(u.ideal)+' · 목표에서 '+value(u.limit)+' 차이면 점수 없음';
- return prefix+'목표 '+value(u.ideal)+' · '+value(u.limit)+(u.direction==='lower'?' 이상':' 이하')+'이면 점수 없음';
+ return prefix+'목표 '+value(u.ideal)+' · '+value(u.limit)+(u.direction==='lower'?' 이상':' 이하')+'이면 점수 없음'+(proposed&&criterion.comparison_proposal.radius_m!==null?' · 조회 직선반경 '+Math.round(criterion.comparison_proposal.radius_m).toLocaleString('ko-KR')+'m':'');
 }
 export function profileView(profile){
  const weights=profileWeights(profile),total=profile.groups.reduce((sum,g)=>sum+g.weight,0);
  return {groups:profile.groups.filter(g=>g.weight>0||g.id==='housing'||profile.criteria.some(c=>c.group_id===g.id&&c.hard)).map(g=>({
   ...g,share:total?g.weight/total:0,criteria:profile.criteria.filter(c=>c.group_id===g.id&&(weights[c.id]>0||c.hard)).map(c=>({
-   ...c,weight:weights[c.id],share:pct(weights[c.id]),hardLabel:hardLabel(c),rule:utilityLabel(c)}))})),
+   ...c,weight:weights[c.id],share:pct(weights[c.id]),hardLabel:hardLabel(c),rule:utilityLabel(c),ruleDetail:proposedComparison(c)?utilityLabel(c,true):null}))})),
   excluded:profile.criteria.filter(c=>weights[c.id]===0&&!c.hard),pendingQuestions:profile.questions};
 }
 export function confirmReviewedProfile(profile,snapshot){
@@ -41,7 +47,8 @@ export function confirmReviewedProfile(profile,snapshot){
  if(profile.questions.some(q=>q.blocking))throw new Error('필요한 답변을 먼저 입력해 주세요.');
  const copy=structuredClone(profile),view=profileView(profile),groups=new Set(view.groups.map(g=>g.id)),criteria=new Set(view.groups.flatMap(g=>g.criteria.map(c=>c.id)));
  copy.revision++;for(const g of copy.groups)if(groups.has(g.id))g.source='user';
- for(const c of copy.criteria)if(criteria.has(c.id)){c.source='user';c.importance_source='user';}
+ // Accepting the proposal enables ranking; keep its original proposed value separately.
+ for(const c of copy.criteria)if(criteria.has(c.id)){if(c.importance_source==='proposed')c.importance_proposal=c.importance;c.source='user';c.importance_source='user';}
  // Unanswered optional questions stay visible; confirming conditions is not an interview answer.
  return copy;
 }

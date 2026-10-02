@@ -472,6 +472,7 @@ def make_handler(state, env_path):
                          '/entry-places.mjs': (STATIC / 'entry-places.mjs', 'text/javascript; charset=utf-8'),
                          '/debug-session.mjs': (STATIC / 'debug-session.mjs', 'text/javascript; charset=utf-8'),
                          '/typography.css': (STATIC / 'typography.css', 'text/css; charset=utf-8'),
+                         '/interview.css': (STATIC / 'interview.css', 'text/css; charset=utf-8'),
                          '/kakao-map.mjs': (STATIC / 'kakao-map.mjs', 'text/javascript; charset=utf-8'),
                          '/vendor/fonts/SUIT-Variable.woff2': (STATIC / 'vendor/fonts/SUIT-Variable.woff2', 'font/woff2'),
                          '/vendor/fonts/SUIT-LICENSE.txt': (STATIC / 'vendor/fonts/SUIT-LICENSE.txt', 'text/plain; charset=utf-8'),

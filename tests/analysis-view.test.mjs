@@ -5,6 +5,12 @@ import {profileWeights,profileView,confirmReviewedProfile,housingQueryProfile,ca
 const criterion=(id,group='living',overrides={})=>({id,group_id:group,module_id:group,label:id,need:id+' 원문',source_quote:id+' 원문',source:'proposed',importance:1,importance_source:'proposed',metric:'distance',utility:{direction:'lower',ideal:500,limit:1500,unit:'m'},hard:null,...overrides});
 function profile(){return {revision:1,request:'합성 조건',context:[],groups:[{id:'living',label:'생활',weight:60,source:'user'},{id:'education',label:'교육',weight:40,source:'proposed'}],criteria:[criterion('mart'),criterion('school','education')],questions:[]};}
 const places=[{id:'a',label:'집 A'},{id:'b',label:'집 B'}];
+test('app proposal uses plain preference labels and keeps numeric basis in details',()=>{
+ const p=profile(),c=p.criteria[0];c.parameters={};c.comparison_proposal={label:'가까우면 좋아요',utility:{...c.utility},radius_m:null};
+ const view=profileView(p).groups[0].criteria[0];assert.match(view.rule,/가까우면.*제안/);assert.doesNotMatch(view.rule,/500|1500/);assert.match(view.ruleDetail,/서비스 제안.*500.*1,500/);
+ c.utility.limit=2000;assert.equal(profileView(p).groups[0].criteria[0].ruleDetail,null);
+ assert.match(profileView(p).groups[0].criteria[0].rule,/2,000/);
+});
 function run(p,values){
  const weights=profileWeights(p),evidence=[],assessments=[];
  for(const place of places){const details=p.criteria.map(c=>{const value=values[place.id]?.[c.id],known=value!==null&&value!==undefined,id=place.id+'_'+c.id;
@@ -20,7 +26,7 @@ test('review shows actual overall shares, original need and zero-weight housing 
 });
 test('confirmation preserves optional questions, hard limits and inactive proposed conditions without mutating input',()=>{
  const p=profile();p.criteria[0].hard={operator:'lte',value:900};p.criteria[0].source='user';p.criteria.push(criterion('inactive','living',{importance:0}));p.questions=[{id:'optional',blocking:false,text:'추가 맥락?',criterion_ids:['mart']}];const before=structuredClone(p);
- const confirmed=confirmReviewedProfile(p,JSON.stringify(p));assert.deepEqual(p,before);assert.deepEqual(confirmed.questions,p.questions);assert.deepEqual(confirmed.criteria[0].hard,p.criteria[0].hard);assert.equal(confirmed.criteria[2].source,'proposed');assert.equal(confirmed.criteria[1].source,'user');assert.equal(confirmed.revision,2);
+ const confirmed=confirmReviewedProfile(p,JSON.stringify(p));assert.deepEqual(p,before);assert.deepEqual(confirmed.questions,p.questions);assert.deepEqual(confirmed.criteria[0].hard,p.criteria[0].hard);assert.equal(confirmed.criteria[2].source,'proposed');assert.equal(confirmed.criteria[1].source,'user');assert.equal(confirmed.criteria[1].importance_source,'user');assert.equal(confirmed.criteria[1].importance_proposal,1);assert.equal(confirmed.revision,2);
 });
 test('blocking interview and stale review cannot approve analysis',()=>{
  const p=profile(),snapshot=JSON.stringify(p);p.criteria[0].importance=2;assert.throws(()=>confirmReviewedProfile(p,snapshot),/바뀌었어/);p.questions=[{blocking:true}];assert.throws(()=>confirmReviewedProfile(p),/먼저/);

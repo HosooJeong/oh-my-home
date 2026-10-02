@@ -1,0 +1,5 @@
+.interview-choices{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.interview-choices:empty{display:none}
+.interview-choices button{min-height:44px;max-width:100%;padding:10px 14px;border:1px solid #cfdbd2;border-radius:14px;background:#f4f7f0;color:#355c4c;font:inherit;font-size:13px;line-height:1.5;text-align:left;cursor:pointer;overflow-wrap:anywhere}
+.interview-choices button:hover,.interview-choices button[aria-pressed=true]{background:#e1eee2;border-color:#658b72}
+.interview-choices button:focus-visible{outline:2px solid #355c4c;outline-offset:3px}
