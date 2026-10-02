@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>살자리 · 경로 확인</title><link rel="stylesheet" href="/typography.css"><link rel="stylesheet" href="/routes.css"><script type="module" src="/routes.mjs"></script></head>
+<body>
+<header><a class="brand" href="/">살자리</a><a href="/workspace">분석 화면</a></header>
+<main>
+<section class="controls" aria-label="경로 설정">
+  <h1>경로 확인</h1>
+  <div class="modes" role="group" aria-label="이동수단"><button type="button" data-mode="walk" aria-pressed="true">도보</button><button type="button" data-mode="transit" aria-pressed="false">대중교통</button></div>
+  <div class="points" role="group" aria-label="지도에서 위치 선택">
+    <button id="start" type="button" aria-pressed="true"><span>출발지</span><small id="start-label">지도에서 선택하세요</small></button>
+    <button id="end" type="button" aria-pressed="false"><span>도착지</span><small id="end-label">지도에서 선택하세요</small></button>
+  </div>
+  <button id="example" class="secondary" type="button">시청 → 진주역 예시</button>
+  <label id="walk-options">도보 경로<select id="walk-option"><option value="BROAD_FIRST">넓은 길 우선</option><option value="SHORTEST">최단 경로</option><option value="ACCESSIBLE">편안한 길</option></select></label>
+  <button id="query" class="primary" type="button" disabled>경로 조회</button>
+  <p id="route-status" role="status" aria-live="polite"></p>
+  <div id="route-results" aria-label="조회한 경로"></div>
+  <p id="route-note" class="note" hidden></p>
+</section>
+<section class="map-wrap" aria-label="경로 지도"><div id="route-map" role="region" aria-label="출발지와 도착지 선택 지도"></div><button id="map-retry" type="button" hidden>지도 다시 불러오기</button></section>
+</main>
+</body></html>

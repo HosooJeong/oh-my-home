@@ -33,6 +33,7 @@ from .leisure_preferences import LeisureInput, leisure_profile
 from .leisure_research import research_leisure
 from .geo import distance_m
 from .transport_preferences import TransportInput, transport_profile
+from .routes import KakaoRoutes, RouteInput, RouteError
 from .orchestrator import Orchestrator
 from .preferences import reevaluate_preferences, update_preferences
 from tools.preview.server import sdk_key
@@ -128,7 +129,7 @@ class HousingProfileInput(Contract):
 
 
 class AppState:
-    def __init__(self, index, runner_factory=CodexRunner, stop_index=None, candidate_pool=None, housing_index=None, education_index=None, safety_index=None, leisure_index=None, debug_transcripts=None):
+    def __init__(self, index, runner_factory=CodexRunner, stop_index=None, candidate_pool=None, housing_index=None, education_index=None, safety_index=None, leisure_index=None, debug_transcripts=None, route_client=None):
         self.index, self.runner_factory = index, runner_factory
         self.candidate_pool = candidate_pool
         self.stop_index = stop_index if stop_index is not None else StopIndex({"generated_at": "unavailable", "records": []})
@@ -143,6 +144,7 @@ class AppState:
         self.lock, self.sessions = Lock(), {}
         self.active_job = None
         self.debug_transcripts = debug_transcripts
+        self.route_client = route_client
 
     def record(self, session, role, content, **details):
         if self.debug_transcripts and session.get('debug_path'):
@@ -456,6 +458,9 @@ def make_handler(state, env_path):
                 self.guard()
                 path = urlsplit(self.path).path
                 files = {"/": (STATIC / "index.html", "text/html; charset=utf-8"),
+                         '/routes': (STATIC / 'routes.html', 'text/html; charset=utf-8'),
+                         '/routes.mjs': (STATIC / 'routes.mjs', 'text/javascript; charset=utf-8'),
+                         '/routes.css': (STATIC / 'routes.css', 'text/css; charset=utf-8'),
                          "/workspace": (STATIC / "workspace.html", "text/html; charset=utf-8"),
                          '/analysis': (STATIC / 'analysis.html', 'text/html; charset=utf-8'),
                          '/analysis.mjs': (STATIC / 'analysis.mjs', 'text/javascript; charset=utf-8'),
@@ -501,6 +506,8 @@ def make_handler(state, env_path):
                     return self.send(200, (ROOT / "data/processed/preview.json").read_bytes())
                 if path == "/api/config":
                     return self.send(200, {"javascriptKey": sdk_key(env_path)})
+                if path == '/api/routes/status':
+                    return self.send(200, (state.route_client or KakaoRoutes(env_path)).status())
                 if path == "/api/bootstrap":
                     token, session = state.session(self.headers.get('X-Session') or None)
                     return self.send(200, {"token": token, 'debug_enabled': bool(state.debug_transcripts),
@@ -544,6 +551,13 @@ def make_handler(state, env_path):
                 _, session = state.session(self.headers.get("X-Session", ""))
                 data = json.loads(raw)
                 path = urlsplit(self.path).path
+                if path == '/api/routes':
+                    # Route coordinates and provider responses must stay out of debug/model records.
+                    request = RouteInput.model_validate(data)
+                    with state.lock:
+                        if state.route_client is None:
+                            state.route_client = KakaoRoutes(env_path)
+                    return self.send(200, state.route_client.query(request))
                 if path == '/api/debug-event':
                     if set(data) != {'event','data'} or data['event'] not in ('entry_selected','candidates_confirmed','category_answer','village_confirmed','conditions_confirmed','analysis_error','comparison_result'):
                         raise ValueError('invalid_debug_event')
@@ -595,6 +609,8 @@ def make_handler(state, env_path):
                 return self.send(404, {"error": "not_found"})
             except PermissionError:
                 self.send(403, {"error": "session_or_origin"})
+            except RouteError as error:
+                self.send(error.http_status, error.public())
             except PreservationError as error:
                 self.send(422, {'error': str(error)})
             except (ValueError, TypeError):
