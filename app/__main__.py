@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import sys
 
-from .codex_runner import CodexRunner, RunnerError
+from .codex_runner import CodexRunner, RunnerError, DEFAULT_MODEL, DEFAULT_REASONING_EFFORT, REASONING_EFFORTS
 from .contracts import Contract, InterviewTurn, NeedProfile, output_schema
 from .intake import prepare_profile
 from .preferences import update_preferences
@@ -25,7 +25,8 @@ def main():
     for p in (intake, sub.add_parser("probe-search", help="공식 문서 검색 지원 확인용; 카테고리 검색 구현 아님")):
         p.add_argument("--output", type=Path, required=True)
         p.add_argument("--timeout", type=float, default=120)
-        p.add_argument("--model", default=None)
+        p.add_argument("--model", default=DEFAULT_MODEL)
+        p.add_argument("--reasoning-effort", default=DEFAULT_REASONING_EFFORT, choices=REASONING_EFFORTS)
         p.add_argument("--codex", default=None)
     schema = sub.add_parser("schema")
     schema.add_argument("--output", type=Path, required=True)
@@ -47,7 +48,8 @@ def main():
                 raise ValueError("invalid preference patch")
             result = update_preferences(profile, **patch).model_dump()
         else:
-            runner = CodexRunner(args.codex, timeout=args.timeout, model=args.model)
+            runner = CodexRunner(args.codex, timeout=args.timeout, model=args.model,
+                                 reasoning_effort=args.reasoning_effort)
             if args.command == "intake":
                 request = args.request_file.read_text(encoding="utf-8").strip()
                 previous = NeedProfile.model_validate_json(args.previous.read_text(encoding="utf-8")) if args.previous else None

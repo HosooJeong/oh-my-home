@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+from functools import lru_cache
 from pathlib import Path
 import shutil
 import signal
@@ -16,18 +18,34 @@ from pydantic import ValidationError
 from .contracts import Contract, output_schema
 
 T = TypeVar("T", bound=Contract)
+DEFAULT_MODEL = "gpt-6.1-sol"
+DEFAULT_REASONING_EFFORT = "medium"
+REASONING_EFFORTS = ("low", "medium", "high", "xhigh", "max", "ultra")
 
 
+@lru_cache(maxsize=1)
 def discover_executable() -> str | None:
     if os.name == "nt":
-        # The desktop binary may be older than the npm CLI used by `codex` in PowerShell.
+        # Pick the newest installed CLI: a stale npm shim can reject current models.
+        candidates = []
+        desktop = shutil.which("codex.exe")
+        if desktop:
+            candidates.append(desktop)
         shim = shutil.which("codex.cmd")
         if shim:
             package = Path(shim).parent / "node_modules/@openai/codex/node_modules/@openai"
             matches = list(package.glob("codex-win32-*/vendor/*/bin/codex.exe"))
             if len(matches) == 1:
-                return str(matches[0])
-        return shutil.which("codex.exe")
+                candidates.append(str(matches[0]))
+        def version(path):
+            try:
+                result = subprocess.run([path, "--version"], capture_output=True,
+                    env=CodexRunner.environment(), timeout=10, creationflags=subprocess.CREATE_NO_WINDOW)
+                match = re.search(rb"codex-cli (\d+)\.(\d+)\.(\d+)", result.stdout)
+                return tuple(map(int, match.groups())) if result.returncode == 0 and match else (0, 0, 0)
+            except (OSError, subprocess.TimeoutExpired):
+                return (0, 0, 0)
+        return max(dict.fromkeys(candidates), key=version) if candidates else None
     return shutil.which("codex")
 
 
@@ -55,7 +73,8 @@ def classify_error(text: str) -> str:
 class CodexRunner:
     _slot = threading.Lock()
 
-    def __init__(self, executable: str | None = None, timeout: float = 120, model: str | None = None):
+    def __init__(self, executable: str | None = None, timeout: float = 120,
+                 model: str | None = DEFAULT_MODEL, reasoning_effort: str = DEFAULT_REASONING_EFFORT):
         path = executable or discover_executable()
         if not path:
             raise RunnerError("codex_not_found")
@@ -64,8 +83,11 @@ class CodexRunner:
             raise RunnerError("native_executable_required")
         if timeout <= 0:
             raise ValueError("positive timeout required")
+        if reasoning_effort not in REASONING_EFFORTS:
+            raise ValueError("unsupported reasoning effort")
         self.timeout = timeout
-        self.model = model
+        self.model = model or DEFAULT_MODEL
+        self.reasoning_effort = reasoning_effort
         self.last_metadata = {}
         self.on_debug_event = None
 
@@ -93,6 +115,7 @@ class CodexRunner:
             "web_search": '"live"' if search else '"disabled"',
             "history.persistence": '"none"', "agents.enabled": "false",
         }
+        settings["model_reasoning_effort"] = json.dumps(self.reasoning_effort)
         # Native features present in the installed CLI. No user MCP/plugin config is loaded.
         for feature in ("shell_tool", "unified_exec", "multi_agent", "apps", "plugins",
                         "remote_plugin", "hooks", "memories", "goals", "browser_use",
@@ -155,8 +178,14 @@ class CodexRunner:
     def _run(self, prompt, response_type, cancel, search, domains):
         started = time.monotonic()
         self.last_metadata = {"search_mode": "live" if search else "disabled",
-                              "requested_model": self.model, "cli_version": self.version()}
-        self.debug_event('AI 요청', prompt, response_type=response_type.__name__, search=search)
+                              "requested_model": self.model,
+                              "requested_reasoning_effort": self.reasoning_effort,
+                              "cli_executable": self.executable,
+                              "model_setting_source": "explicit_cli_argument",
+                              "effort_setting_source": "explicit_cli_config",
+                              "cli_version": self.version()}
+        self.debug_event('AI 요청', prompt, response_type=response_type.__name__, search=search,
+                         model=self.model, reasoning_effort=self.reasoning_effort)
         if cancel.is_set():
             raise RunnerError("cancelled")
         with tempfile.TemporaryDirectory(prefix="saljari-codex-") as temp:

@@ -8,7 +8,7 @@ import time
 import unittest
 from unittest.mock import patch
 
-from app.codex_runner import CodexRunner, RunnerError, classify_error
+from app.codex_runner import CodexRunner, RunnerError, classify_error, discover_executable
 from app.contracts import Contract, InterviewTurn
 from app.intake import prepare_profile
 from app.preferences import reevaluate_preferences, update_preferences
@@ -66,6 +66,8 @@ class RunnerTests(unittest.TestCase):
         result = runner.run('input with quotes; $() and ` remain stdin', Tiny)
         self.assertEqual(result.answer, "ok")
         self.assertEqual(runner.last_metadata["usage"]["input_tokens"], 1)
+        self.assertEqual(runner.last_metadata["requested_model"], "gpt-6.1-sol")
+        self.assertEqual(runner.last_metadata["requested_reasoning_effort"], "medium")
         self.assertNotIn("PRIVATE", json.dumps(runner.last_metadata))
         self.assertFalse(runner.last_directory.exists())
 
@@ -118,11 +120,39 @@ class RunnerTests(unittest.TestCase):
         self.assertIn('--ignore-user-config', args)
         self.assertIn('web_search="disabled"', args)
         self.assertIn('features.shell_tool=false', args)
+        self.assertEqual(args[args.index('--model') + 1], 'gpt-6.1-sol')
+        self.assertIn('model_reasoning_effort="medium"', args)
         with patch.dict('os.environ', {'OPENAI_API_KEY':'private','CODEX_THREAD_ID':'private'}):
             self.assertNotIn('OPENAI_API_KEY', runner.environment())
             self.assertNotIn('CODEX_THREAD_ID', runner.environment())
         with self.assertRaises(ValueError):
             runner.command(Path("work"), Path("schema"), Path("out"), True, ["site.com;bad"])
+
+    def test_explicit_model_effort_override_and_invalid_effort(self):
+        runner = CodexRunner(sys.executable, model='gpt-6-sol', reasoning_effort='high')
+        args = runner.command(Path('work'), Path('schema'), Path('out'))
+        self.assertEqual(args[args.index('--model') + 1], 'gpt-6-sol')
+        self.assertIn('model_reasoning_effort="high"', args)
+        self.assertEqual(CodexRunner(sys.executable, model=None).model, 'gpt-6.1-sol')
+        with self.assertRaisesRegex(ValueError, 'unsupported reasoning effort'):
+            CodexRunner(sys.executable, reasoning_effort='unknown')
+
+    @unittest.skipUnless(sys.platform == 'win32', 'Windows runtime selection')
+    def test_newest_installed_cli_selected_instead_of_stale_npm_shim(self):
+        desktop = 'C:/codex-desktop/codex.exe'
+        npm = Path('C:/npm/codex-native/codex.exe')
+        paths = {'codex.exe':desktop, 'codex.cmd':'C:/npm/codex.cmd'}
+        self.addCleanup(discover_executable.cache_clear)
+        for desktop_version, expected in [('0.159.2',desktop),('0.140.0',str(npm))]:
+            discover_executable.cache_clear()
+            def version(args, **_kwargs):
+                value = desktop_version if args[0] == desktop else '0.155.1'
+                return subprocess.CompletedProcess(args,0,('codex-cli '+value).encode(),b'')
+            with self.subTest(desktop_version=desktop_version), \
+                    patch('app.codex_runner.shutil.which',side_effect=paths.get), \
+                    patch('app.codex_runner.Path.glob',return_value=[npm]), \
+                    patch('app.codex_runner.subprocess.run',side_effect=version):
+                self.assertEqual(discover_executable(),expected)
 
 
 class PreferencesAndIntakeTests(unittest.TestCase):
