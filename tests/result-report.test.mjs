@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {categoryReports,radarGeometry,researchNotes,criterionReason} from '../app/static/result-report.mjs';
+import {categoryReports,radarGeometry,researchNotes,criterionReason,overviewReasons,categoryScope} from '../app/static/result-report.mjs';
 import {candidateViews,profileWeights} from '../app/static/analysis-view.mjs';
 const criterion=(id,group,importance=1)=>({id,group_id:group,module_id:group,label:id,need:id,importance,utility:{direction:'lower',ideal:500,limit:1500,unit:'m'},hard:null});
 const profile=()=>({groups:[{id:'living',label:'생활',weight:80},{id:'education',label:'교육',weight:20},{id:'housing',label:'비용',weight:0}],criteria:[criterion('mart','living'),criterion('clinic','living',3),criterion('school','education')],questions:[],context:[]});
@@ -47,4 +47,53 @@ test('qualitative notes require category-bound request IDs and remain distinct f
 });
 test('evaluation reason uses the candidate measurement and personal target, while missing stays undecided',()=>{
  const p=profile(),[v]=views(p,{a:{mart:800,clinic:200,school:null}});assert.match(criterionReason(v.rows[0]),/목표보다 300m 더 멀어/);assert.match(criterionReason(v.rows[1]),/목표 수준을 충족/);assert.match(criterionReason(v.rows[2]),/충족 여부는 미확인/);
+});
+
+const distanceRow=(metric='convenience_straight_line_distance_m',overrides={})=>({known:true,fit:1,weight:.7,reason:'자료 미확인',criterion:{...criterion('convenience','living'),metric},fact:{value:220,unit:'m',source_record:'shop:a'},facilities:[{id:'shop:a',name:'씨유 시험점'}],...overrides});
+test('named convenience explanation ties the observed straight-line distance to the preference, never walking or current operation',()=>{
+ const row=distanceRow(),before=structuredClone(row),text=criterionReason(row);
+ assert.match(text,/씨유 시험점.*직선거리 220m.*편의점이 가까운.*선호에 잘 맞/);
+ assert.doesNotMatch(text,/도보 \d|차량|분 거리|영업 중|운영 중/);assert.deepEqual(row,before);
+ assert.match(categoryScope({id:'living',rows:[row]}),/실제 이동 경로·시간은 미확인.*현재 영업 여부/);
+});
+test('flexible mart preference is described without inventing car ownership or replacing explicit numeric rules',()=>{
+ const row=distanceRow('grocery_straight_line_distance_m');row.criterion.comparison_proposal={label:'조금 멀어도 괜찮아요',utility:{...row.criterion.utility},radius_m:null};
+ assert.match(criterionReason(row),/마트는 조금 멀어도 괜찮다는 선호/);assert.doesNotMatch(criterionReason(row),/차량|자동차|운전|도보/);
+ row.criterion.utility.ideal=600;assert.doesNotMatch(criterionReason(row),/조금 멀어도 괜찮다는/);
+});
+test('unrelated facility identity or missing facility cannot supply a name to a bound distance',()=>{
+ const row=distanceRow();row.facilities=[{id:'shop:b',name:'다른 집 매장'}];
+ assert.match(criterionReason(row),/등록자료로 확인한 편의점.*220m/);assert.doesNotMatch(criterionReason(row),/다른 집 매장/);
+ row.facilities=[];assert.doesNotMatch(criterionReason(row),/undefined|null/);
+});
+test('partially satisfied and zero-fit distance explanations remain preferences without implying candidate exclusion',()=>{
+ const row=distanceRow();row.fit=.6;assert.match(criterionReason(row),/조금 아쉬운/);row.fit=0;assert.match(criterionReason(row),/선호와 차이가 큰/);
+ assert.doesNotMatch(criterionReason(row),/탈락|추천 제외|도보로.*힘들/);row.fact.value=0;row.fit=1;assert.match(criterionReason(row),/직선거리 0m/);
+});
+test('unknown or conflicting evidence never becomes a named satisfied facility, even with a partial value/list',()=>{
+ const row=distanceRow();row.known=false;row.fit=null;assert.match(criterionReason(row),/미확인/);assert.doesNotMatch(criterionReason(row),/씨유 시험점|220m|잘 맞/);
+ row.reason='자료 충돌';assert.match(criterionReason(row),/자료가 서로 맞지 않아/);row.reason='현재 정량 평가 미지원';assert.match(criterionReason(row),/평가하기 어려워/);
+});
+test('school and bus proximity do not imply school assignment, route safety, usable service or walking distance',()=>{
+ for(const [metric,id,scope] of [['school_straight_line_distance_m','education',/배정 학교.*통학로 안전/],['bus_stop_straight_line_distance_m','transport',/노선·방향·배차/]]){
+  const row=distanceRow(metric);assert.match(criterionReason(row),/직선거리/);assert.match(categoryScope({id,rows:[row]}),scope);
+ }
+ const row=distanceRow('meeting_straight_line_distance_m');row.fact.source_record='user:meeting';row.facilities=[];row.criterion.parameters={meeting_label:'함께 만날 장소'};assert.match(criterionReason(row),/지정하신 함께 만날 장소/);assert.doesNotMatch(criterionReason(row),/가장 가까운/);
+});
+test('verified academy count explains its subject, level, search scope and examples without claiming course quality',()=>{
+ const row=distanceRow('academy_count_within_radius',{fact:{value:4,unit:'count',source_record:'education-snapshot'},facilities:[{id:'a',kind:'academy',name:'시험 수학학원'},{id:'b',kind:'academy',name:'다른 수학학원'}]});
+ row.criterion.utility={direction:'higher',ideal:3,limit:0,unit:'count'};row.criterion.parameters={school_level:'elementary',subject:'math',radius_m:'1500'};
+ const text=criterionReason(row);assert.match(text,/직선반경 1,500m.*초등학생 수학 학원 4곳.*시험 수학학원.*선호에 잘 맞/);
+ assert.doesNotMatch(text,/수업이 좋|만족도가 높|모집 중/);assert.match(categoryScope({id:'education',rows:[row]}),/수업의 질·현재 모집 여부/);
+ row.fact.value=1;row.fit=0;assert.doesNotMatch(criterionReason(row),/선택지가 없어|확인되지 않아/);
+ row.fact.value=0;row.facilities=[];assert.match(criterionReason(row),/등록자료에서 원하는 학원이 확인되지 않아/);
+});
+test('partial academy inventory cannot be narrated as a complete total or confirmed satisfaction',()=>{
+ const row=distanceRow('academy_count_within_radius',{known:false,fit:null,fact:{value:2,unit:'count'},facilities:[{id:'a',kind:'academy',name:'부분 학원'}]});
+ assert.match(criterionReason(row),/미확인/);assert.doesNotMatch(criterionReason(row),/2곳|부분 학원|잘 맞/);
+});
+test('overview explains the selected candidate and highest-priority confirmed needs only, without changing scores or input',()=>{
+ const rows=[distanceRow(),distanceRow('grocery_straight_line_distance_m',{weight:.3,fact:{value:82,unit:'m',source_record:'mart:a'},facilities:[{id:'mart:a',name:'시험 마트'}]}),distanceRow('park_straight_line_distance_m',{weight:0}),distanceRow('school_straight_line_distance_m',{known:false,fit:null,weight:.9})],view={rows},before=structuredClone(view);
+ const reasons=overviewReasons(view);assert.equal(reasons.length,2);assert.match(reasons[0],/씨유 시험점/);assert.match(reasons[1],/시험 마트.*82m/);assert.deepEqual(view,before);
+ rows[0].fact.source_record='shop:b';rows[0].facilities=[{id:'shop:b',name:'비교 집 편의점'}];assert.match(overviewReasons(view)[0],/비교 집 편의점/);assert.doesNotMatch(overviewReasons(view)[0],/씨유 시험점/);
 });
