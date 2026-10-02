@@ -2,7 +2,11 @@
 import {readCandidates} from './entry-places.mjs';
 export const STORAGE_KEY='saljari.village.v1';
 export const CATEGORIES=Object.freeze([
- {id:'living',label:'생활·건강',short:'생활',color:'#e49375',angle:-150,question:'일상에서 가까웠으면 하는 곳은 어디인가요?',placeholder:'큰 마트에서 자주 장을 봐요. 걸어서 10분 정도면 좋겠어요.'},
+ {id:'living',label:'생활·건강',short:'생활',color:'#e49375',angle:-150,question:'일상에서 가까웠으면 하는 곳은 어디인가요?',placeholder:'큰 마트에서 자주 장을 봐요. 걸어서 10분 정도면 좋겠어요.',examples:[
+  {label:'마트 가까이',text:'마트가 가까운 게 중요해요. 편의점은 조금 멀어도 괜찮아요.'},
+  {label:'편의점 가까이',text:'편의점을 자주 이용해요. 편의점이 가까운 게 더 중요하고, 마트는 조금 멀어도 괜찮아요.'},
+  {label:'둘 다 비슷하게',text:'마트와 편의점이 모두 가까우면 좋겠어요. 두 곳의 접근성을 비슷하게 중요하게 생각해요.'},
+ ]},
  {id:'transport',label:'교통·동선',short:'교통',color:'#e9bc62',angle:-90,question:'주로 어디로, 어떻게 이동하시나요?',placeholder:'버스로 출퇴근해요. 정류장이 가깝고 환승이 적으면 좋겠어요.'},
  {id:'education',label:'교육·육아',short:'교육',color:'#7babc4',angle:-30,question:'학교·학원·통학에서 무엇이 중요한가요?',placeholder:'초등학생 아이가 있어요. 학교와 영어 학원이 가까우면 좋겠어요.'},
  {id:'safety',label:'안전·환경',short:'안전',color:'#9c9ac5',angle:30,question:'확인하고 싶은 주변 환경이 있나요?',placeholder:'저녁에 걸어 다녀요. 야간 보행과 주변 소음이 신경 쓰여요.'},

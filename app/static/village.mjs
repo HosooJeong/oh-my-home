@@ -38,6 +38,20 @@ function icon(name){
 document.querySelectorAll('[data-icon]').forEach(el=>el.append(icon(el.dataset.icon)));
 const status=message=>$('village-status').textContent=message;
 function save(){try{sessionStorage.setItem(STORAGE_KEY,JSON.stringify(draft));}catch{status('입력을 저장하지 못했어요.');}}
+function renderExamples(category){
+ const group=$('question-examples');group.replaceChildren();group.hidden=!category.examples?.length;
+ group.setAttribute('aria-label',category.label+' 입력 예시');group.style.setProperty('--sample-color',category.color);$('question-sample-status').textContent='';
+ for(const example of category.examples||[]){
+  const button=document.createElement('button');button.type='button';button.textContent=example.label;
+  button.addEventListener('click',()=>{
+   if(mode!=='detail'||order[step]!==category.id)return;
+   const answer=$('category-answer'),current=answer.value;
+   const next=current.split('\n').includes(example.text)?current:current?current+'\n\n'+example.text:example.text;
+   if(next.length>answer.maxLength){$('question-sample-status').textContent='예시를 추가하면 450자를 넘어요. 입력 내용을 줄여 주세요.';return;}
+   answer.value=next;answer.dispatchEvent(new Event('input',{bubbles:true}));answer.focus();answer.setSelectionRange(next.length,next.length);
+  });group.append(button);
+ }
+}
 function snapshot(){
  const percentages=shares(draft.blocks);
  return {mode,coordinate_system:'virtual floor: origin=home; X/Z horizontal; Y height; camera never changes priorities',focus:draft.focus,
@@ -72,6 +86,7 @@ function render(){
   const c=CATEGORIES.find(c=>c.id===order[step]);draft.focus=c.id;
   $('question-progress').textContent=`${step+1}/${order.length}`;$('question-category').textContent=c.label;$('question-label').textContent=c.question;
   $('question-mark').style.setProperty('--brick-color',c.color);$('question-mark').replaceChildren(icon(c.id));$('category-answer').value=draft.answers[c.id]||'';$('category-answer').placeholder=c.placeholder;
+  renderExamples(c);
   $('question-prev').hidden=step===0;$('question-next-label').textContent=step===order.length-1?'입력 확인':'다음';
  }else if(mode==='review'){
   $('question-progress').textContent=`${order.length}/${order.length}`;$('answer-summary').replaceChildren();
@@ -86,7 +101,7 @@ $('change-start').addEventListener('click',()=>{mode='start';world?.cancelDrag()
 $('enter-town').addEventListener('click',()=>{if(mode!=='location'||!entryReady(draft))return;locationVersion++;mode='town';save();render();debugEvent('candidates_confirmed',{entry:draft.entry,location:draft.entry==='discover'?draft.location:null,candidates:draft.entry==='discover'?[]:draft.candidates});status(draft.blocks.length?'':'블록을 집 주변에 놓아주세요.');});
 $('open-details').addEventListener('click',()=>{if(mode!=='town'||!draft.blocks.length||!world?.available)return;world.cancelDrag();order=draft.blocks.slice().sort((a,b)=>levelForPosition(a.x,a.z)-levelForPosition(b.x,b.z)).map(b=>b.id);step=0;mode='detail';save();status('');render();window.scrollTo(0,0);});
 $('back-town').addEventListener('click',()=>{mode='town';render();window.scrollTo(0,0);});
-$('category-answer').addEventListener('input',event=>{draft.answers[order[step]]=event.target.value.slice(0,450);draft.handoff=false;save();});
+$('category-answer').addEventListener('input',event=>{draft.answers[order[step]]=event.target.value.slice(0,450);draft.handoff=false;$('question-sample-status').textContent='';save();});
 function nextQuestion(){const c=CATEGORIES.find(c=>c.id===order[step]);debugEvent('category_answer',{category:c.id,question:c.question,answer:draft.answers[c.id]||''});if(step<order.length-1)step++;else mode='review';save();render();window.scrollTo(0,0);}
 $('question-next').addEventListener('click',nextQuestion);
 $('question-prev').addEventListener('click',()=>{step=Math.max(0,step-1);render();});
