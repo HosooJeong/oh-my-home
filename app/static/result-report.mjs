@@ -58,7 +58,7 @@ export function categoryScope(category){
  const metrics=new Set(category.rows.filter(valid).map(r=>r.criterion.metric)),notes=[];
  if([...metrics].some(m=>distancePreferences[m]))notes.push('거리 평가는 위치 간 직선거리 기준이며 실제 이동 경로·시간은 미확인이에요.');
  if(['living','health','dining'].includes(category.id)&&metrics.size)notes.push('매장의 현재 영업 여부는 별도 확인이 필요해요.');
- if(category.id==='health'&&metrics.size)notes.push('등록 업종의 접근성 비교이며 실제 진료과·진료 수준·응급 대응은 평가하지 않아요.');
+ if(category.id==='health'&&metrics.size)notes.push('거리 점수는 등록 업종 기준이며 진료과 확인과는 별개예요. 진료 수준·응급 대응은 평가하지 않아요.');
  if(category.id==='dining'&&metrics.size)notes.push('등록 음식점의 접근성 비교이며 맛·가격·식단 적합성은 평가하지 않아요.');
  if(metrics.has('bus_stop_straight_line_distance_m'))notes.push('이용할 노선·방향·배차는 아직 확인하지 않았어요.');
  if(metrics.has('school_straight_line_distance_m'))notes.push('가까운 학교가 배정 학교를 뜻하지는 않으며 통학로 안전은 별도 확인이 필요해요.');
@@ -96,7 +96,7 @@ export function researchNotes(data,requests,category='overview'){
  if(!data)return [];
  const ids=new Set(requests.filter(r=>category==='overview'||r.module===category).map(r=>r.id)),notes=[];
  const include=x=>category==='overview'||(x.request_ids||[]).some(id=>ids.has(id));
- for(const item of data.items||[])for(const x of item.excerpts||[])if(include(x))notes.push({kind:'facility',facilityId:item.facility_id,excerpt:x});
+ for(const item of data.items||[])for(const x of item.excerpts||[])if(include(x))notes.push({kind:'facility',facilityId:item.facility_id,excerpt:x,candidateIds:item.candidate_ids||[],candidateDistances:item.candidate_distances||{},scope:item.web_discovery?'진주시에서 발견한 시설 · 집별 거리·생활권 적용 미확인':null,role:x.research_kind==='facility_fact'?(x.source_role==='government'?'공공기관의 시설 안내':'운영자의 공식 안내'):null});
  for(const item of data.safety?.items||[])for(const x of item.excerpts||[])if((category==='overview'||category==='safety')&&include(x))notes.push({kind:'area',title:item.area_name,excerpt:x,scope:'지역 공식 자료 · 집별 안전 판정 미확인'});
  for(const item of data.leisure?.discoveries||[]){
   const matching=category==='overview'||category==='leisure'&&requests.some(r=>r.module==='leisure'&&r.criterion_ids?.includes(item.criterion_id));

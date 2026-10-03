@@ -99,7 +99,7 @@ def scope_matches(text, criterion, primary, source_id, sources, previous, answer
     paired_weight = bool(re.search(r'(비중|중요도|두\s*조건)', text) and re.search(r'\d\s*:\s*\d', text))
     for key in reversed(keys[max(0, position - (6 if paired_weight else 3)):position]):
         preceding = sources[key]
-        if re.match(r'(생활·건강|교통·동선|교육·육아|안전·환경|여가·관계|집·비용):', preceding):
+        if re.match(r'(생활·건강|생활·장보기|교통·동선|교육·육아|안전·환경|건강·의료|여가·관계|집·비용|식사·외식):', preceding):
             return False
         if preceding == primary or pattern and re.search(pattern, preceding):
             return True
@@ -182,6 +182,19 @@ def bind_fields(doc, sources, needs, previous=None, answers=()):
                 linked = any((pattern := intent.get((key, c['value'])))
                              and re.search(pattern, c['source_quote'])
                              and any(re.search(pattern, t) for t in texts) for c in facts)
+            if not linked:
+                # Functional fact research is automatic now: a local qualifier need not say "search".
+                # Only shared research keys, the same criterion, and the existing bounded clause check qualify.
+                module=key.split('_research',1)[0]
+                shared=key in {module+'_research',module+'_research_target',module+'_research_criterion_id',
+                              module+'_research_subject',module+'_research_school_level',module+'_research_radius_m'}
+                related=[criteria[id] for id in n.criterion_ids if criteria[id]['module_id']==module]
+                if not related and not n.criterion_ids and n.group_id==module:
+                    related=[c for c in criteria.values() if c['module_id']==module and
+                        scope_matches(texts[0],c,c['source_quote'],n.source_id,sources,previous,answers)]
+                if n.field=='context' and shared and module in ('education','health') and related:
+                    linked=all(scope_matches(texts[0],c,c['source_quote'],n.source_id,sources,previous,answers)
+                        and any(f['source_quote']==c['source_quote'] for f in facts) for c in related)
             if not linked:
                 # Shared research flags can have separate requests concerning the same facility type.
                 linked = n.field == 'context' and any(

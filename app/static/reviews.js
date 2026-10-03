@@ -1,6 +1,6 @@
 "use strict";
 const reviewState = {key:null, job:null, accepted:false, cancelled:false, requested:false, result:null, selected:new Set()};
-const topics = {size:'규모', selection:'품목', price:'가격', service:'서비스', experience:'이용 경험',course:'과목·수업 형태',teaching:'수업 경험'};
+const topics = {size:'규모', selection:'품목', price:'가격', service:'이용 조건', experience:'이용 경험',course:'과목·수업 형태',teaching:'수업 경험',subject:'과목',school_level:'대상 학년',class_form:'수업 형태',department:'진료과'};
 const sentiments = {positive:'만족 의견', negative:'불만 의견', mixed:'만족·불만 혼합', neutral:'경험 설명'};
 function reviewLink(label, url) {
   const link = node('a', label, 'external-link');
@@ -17,7 +17,7 @@ function updateReviewControls() {
 }
 function renderReviews() {
   if (!state.run?.report) return resetReviews();
-  const facilities = Object.values(state.run.facilities).filter(f => ['shops','academy'].includes(f.kind));
+  const facilities = Object.values({...state.run.facilities,...(reviewState.result?.facilities||{})}).filter(f => ['shops','academy','medical'].includes(f.kind));
   if (reviewState.key !== state.run.review_key) {
     resetReviews(); reviewState.key = state.run.review_key;
     facilities.filter(f => !state.run.research_facility_ids || state.run.research_facility_ids.includes(f.id)).slice(0, 3).forEach(f => reviewState.selected.add(f.id));
@@ -38,7 +38,7 @@ function renderReviews() {
     });
     label.append(input, document.createTextNode('후기 조사에 포함')); card.append(label);
     const links = node('div', undefined, 'review-links');
-    links.append(reviewLink('카카오맵에서 보기', facility.review_links.kakao), reviewLink('네이버지도에서 보기', facility.review_links.naver));
+    if(facility.review_links)links.append(reviewLink('카카오맵에서 보기', facility.review_links.kakao), reviewLink('네이버지도에서 보기', facility.review_links.naver));
     card.append(links);
     const result = reviewState.result?.items.find(i => i.facility_id === facility.id);
     if (result) {
@@ -46,10 +46,12 @@ function renderReviews() {
         `출처 ${new Set(result.excerpts.map(e => e.source_url)).size}개에서 문구 ${result.excerpts.length}개를 가져왔어요.`, 'hint'));
       for (const excerpt of result.excerpts) {
         const detail = node('div', undefined, 'review-excerpt');
-        detail.append(node('strong', `${topics[excerpt.topic]} · ${sentiments[excerpt.sentiment]}`),
+        const factual=excerpt.research_kind==='facility_fact';
+        detail.append(node('strong', `${topics[excerpt.topic]||'확인 내용'} · ${factual?'공식 안내':sentiments[excerpt.sentiment]}`),
           node('blockquote', excerpt.quote), node('p', 'AI 요약: ' + excerpt.interpretation),
           reviewLink(excerpt.title, excerpt.source_url),
-          node('p', excerpt.published_date ? `작성 ${excerpt.published_date}` : '작성일 미확인', 'hint'));
+          node('p', excerpt.published_date ? `작성 ${excerpt.published_date}` : factual?`갱신일 미확인 · 직접 조회 ${excerpt.checked_at?.slice(0,10)||'미확인'}`:'작성일 미확인', 'hint'));
+        if(facility.web_discovery)detail.append(node('p','웹에서 발견한 시설 · 집별 거리·생활권 적용 미확인','hint'));
         const identity = node('details'); identity.append(node('summary', '같은 지점으로 연결한 근거'), node('p', excerpt.identity_note));
         detail.append(identity); card.append(detail);
       }

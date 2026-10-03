@@ -4,6 +4,11 @@ import {categoryReports,radarGeometry,researchNotes,criterionReason,overviewReas
 import {candidateViews,profileWeights} from '../app/static/analysis-view.mjs';
 const criterion=(id,group,importance=1)=>({id,group_id:group,module_id:group,label:id,need:id,importance,utility:{direction:'lower',ideal:500,limit:1500,unit:'m'},hard:null});
 const profile=()=>({groups:[{id:'living',label:'생활',weight:80},{id:'education',label:'교육',weight:20},{id:'housing',label:'비용',weight:0}],criteria:[criterion('mart','living'),criterion('clinic','living',3),criterion('school','education')],questions:[],context:[]});
+test('official facility facts retain per-home scope while web discoveries disclose unknown distance',()=>{
+ const requests=[{id:'edu',module:'education'},{id:'med',module:'health'}],fact={research_kind:'facility_fact',source_role:'operator',field:'department',value:'내과'};
+ const data={items:[{facility_id:'known',candidate_ids:['a'],candidate_distances:{a:120},excerpts:[{...fact,request_ids:['med']}]},{facility_id:'new',web_discovery:true,excerpts:[{...fact,request_ids:['med']}]}]};
+ const notes=researchNotes(data,requests,'health');assert.equal(notes.length,2);assert.deepEqual(notes[0].candidateIds,['a']);assert.equal(notes[0].candidateDistances.a,120);assert.equal(notes[0].role,'운영자의 공식 안내');assert.match(notes[1].scope,/집별 거리.*미확인/);assert.deepEqual(notes[1].candidateDistances,{});assert.equal(researchNotes(data,requests,'education').length,0);
+});
 function views(p,values){
  const weights=profileWeights(p),evidence=[],assessments=[];
  for(const [id,measurements] of Object.entries(values)){
@@ -110,5 +115,6 @@ test('six fully verified categories close every edge including the last-to-first
 test('medical and dining explanations disclose registered access without medical quality, taste or current-operation claims',()=>{
  for(const [metric,id,limitation] of [['clinic_straight_line_distance_m','health',/진료 수준·응급 대응/],['everyday_meal_straight_line_distance_m','dining',/맛·가격·식단 적합성/]]){
   const row=distanceRow(metric);const text=criterionReason(row);assert.match(text,/직선거리 220m/);assert.doesNotMatch(text,/치료를 잘|맛있는|운영 중|도보/);assert.match(categoryScope({id,rows:[row]}),limitation);
+  if(id==='health')assert.match(categoryScope({id,rows:[row]}),/거리 점수.*진료과 확인과는 별개/);
  }
 });

@@ -149,8 +149,16 @@ school_level, radius_m(직선반경의 숫자를 문자열로)을 명시한 만�
 반경/충분한 개소 수/만족하기 어려운 개소 수를 사용자에게 계산하게 하지 마라. 학교 배정·실제 반 크기·횡단/안전을
 거리/정원으로 대신하지 마라. 그런 비교 요구는 별도 미지원 조건으로 보존하라.
 education_level, education_subject, school_travel_mode는 명시된 배경을 context에 보존하라.
-학원 수업 형태·규모·후기 등 정성적 보완을 요청하면 education_research=requested를 context에 넣어라.
+학원 과목·대상 학년·수업 형태를 원하는 조건 자체가 실제 이용 조건 확인 요청이다.
+사용자가 '검색/조사해 줘'라고 덧붙이지 않아도 education_research=requested,
+education_research_question에 과목·대상 학년·수업 형태를 확인하는 공개 질문을 context에 넣어라.
+학교 거리만 요청한 경우에는 학원 조사를 추가하지 마라. 학원 수업 형태·규모·후기를 요청해도 같은 방식으로 보존하라.
 그런 서술 요청 자체에 임의 점수나 중요도를 주지 마라. 보완 검색은 비교 후 별도 파이프라인이 수행한다.
+과목·학년 확인이 같은 학원 선택지 조건을 구체화하는 설명이면 별도 미지원 비교 조건을 중복 생성하지 마라.
+예: '초등 수학 학원이 가까우면 좋아요. 어떤 과목과 학년을 가르치는지가 중요해요.'는
+academy_count_within_radius의 subject=math, school_level=elementary와 공식 웹 조사 질문으로 보존한다.
+criteria와 조사 범위의 source_id는 과목/학년을 실제 명시한 첫 문장으로 연결하고,
+두 번째 문장은 확인 목적의 context로 별도 보존한다. 반 크기/교육 수준 등 별도 요구는 지우지 마라.
 안전·환경 module_id=safety: 현재 CCTV 등록 위치는 참고 정보만 제공하며 안전 점수를 지원하지 않는다.
 CCTV 수나 근접성을 범죄/야간 안전, 보행 사고, 침수/재해, 소음/대기환경으로 대체하지 마라.
 이런 비교 요구는 미지원 criteria로 보존하라. 명시된 문제는 night_safety_or_environment_unverified,
@@ -179,10 +187,15 @@ parameters.activity는 gym/pilates/table_tennis/swimming/tennis/yoga/other, acti
 같은 공원/동일 만남 지점의 동일 거리 조건을 중복 생성하지 마라.
 parameters에 해당 없는 필드는 null이다.
 생활 매장 정성 조사 요청은 context qualitative_research_requested=requested로 보존하라.
-건강·의료/식사·외식의 시설 이용 조건 보완 요청은 health_research/dining_research=requested와
-health_research_question/dining_research_question에 질문을 보존한다. 진료 수준/임상적 추천은 생성하지 마라.
-health_research_target=pharmacy/clinic, dining_research_target=everyday_meal/restaurant다.
-각 보완 조사 질문을 living_research_question/education_research_question/safety_research_question/leisure_research_question에
+건강·의료에서 병원·의원·특정 진료과를 원하면 '조사'라는 말을 덧붙이지 않아도 health_research=requested와
+health_research_question에 실제 진료과·이용 조건 확인 질문을 보존한다.
+진료과 확인은 시설이 공지한 사실 조사이며 의료 수준 평가나 임상적 추천이 아니다.
+원하는 진료과를 내과/소아과 등록 업종이나 일반 의원 거리로 대신 충족시키지 마라.
+특정 진료과 선호는 별도 미지원 비교 조건으로 보존하고, 공공자료 후보→공식 웹 사실 확인으로 연결한다.
+약국 거리만 요청하면 병원 진료과 조사를 추가하지 마라.
+식사·외식 시설 이용 조건 보완 요청은 dining_research=requested와 dining_research_question에 보존한다.
+health_research_target=pharmacy/clinic/hospital, dining_research_target=everyday_meal/restaurant다.
+각 조사 질문을 living_research_question/education_research_question/health_research_question/dining_research_question/safety_research_question/leisure_research_question에
 원래 확인하려던 조건을 살린 간결한 비식별 질문으로 보존하라. source_id는 그 질문의 원문이다.
 알레르기 상품 표시/휠체어 출입·반 규모/과목/요일·이용 형태/가격 등 기능 조건은 유지하되
 사람 이름·연락처·개인 진단·집 주소/좌표·가족 신상은 질문에 넣지 마라. 시설 공개 상호/종목은 유지할 수 있다.

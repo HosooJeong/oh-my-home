@@ -19,6 +19,7 @@ from .candidates import CandidatePool, GenerationInput
 from .intake import prepare_profile
 from .debug_transcript import DebugTranscripts
 from .reviews import ReviewInput, map_links, research_reviews
+from .facility_facts import research_facility_facts, discover_facility_facts
 from .research_plan import build_research_plan, evidence_status
 from .preference_edits import PreservationError, edited, edit_quote, preserve_need
 from .modules.living import LivingModule, ShopIndex
@@ -335,17 +336,32 @@ class AppState:
                     session['jobs'][request_id]['request_statuses']=[dict(r) for r in statuses]
                     if public_plan is not None:public_plan['requests']=[dict(r) for r in statuses]
             def execute(runner, cancel):
-                result={'items':[], 'score_eligible':False, 'safety':None, 'leisure':None, 'steps':[], 'errors':[]}
+                result={'items':[], 'facilities':{}, 'score_eligible':False, 'safety':None, 'leisure':None, 'steps':[], 'errors':[]}
                 for task in tasks:
-                    module=task['module'];ids=task['request_ids']
-                    if not (task.get('facilities') or task.get('targets') or task.get('scope')):continue
+                    module=task['module'];ids=task['request_ids'];stage='research'
+                    if not (task.get('facilities') or task.get('targets') or task.get('scope') or
+                            task.get('research_kind')=='facility_fact' and task.get('questions')):continue
                     if cancel.is_set():
                         mark([r['id'] for r in statuses if r['status'] in ('queued','running')],'cancelled','cancelled')
                         raise RunnerError('cancelled')
                     mark(ids,'running')
                     try:
                         if module in ('living','education','health','dining','facility_reviews'):
-                            value=research_reviews(runner,task['facilities'],cancel=cancel,questions=task.get('questions'))
+                            researcher=research_facility_facts if task.get('research_kind')=='facility_fact' else research_reviews
+                            value=researcher(runner,task['facilities'],cancel=cancel,questions=task.get('questions')) if task['facilities'] else {'items':[]}
+                            if task.get('research_kind')=='facility_fact' and not any(i.get('excerpts') for i in value.get('items',[])):
+                                if task['facilities']:
+                                    result['steps'].append({'module':module,'stage':'registered_facility_facts',**runner.last_metadata})
+                                stage='facility_discovery'
+                                try:
+                                    discovered=discover_facility_facts(runner,module,task.get('questions',[]),cancel=cancel,areas=task.get('discovery_areas',[]))
+                                    value['items'].extend(discovered.get('items',[]))
+                                    result['facilities'].update(discovered.get('facilities',{}))
+                                    value['response_validation']=discovered.get('response_validation',{})
+                                except Exception as discovery_error:
+                                    if cancel.is_set():raise RunnerError('cancelled')
+                                    result['errors'].append({'module':module,'stage':'facility_discovery',
+                                        'code':discovery_error.code if isinstance(discovery_error,RunnerError) else 'research_failed'})
                             result['items'].extend(value.get('items',[]))
                         elif module=='safety':
                             value=research_safety(runner,task['targets'],cancel=cancel);result['safety']=value
@@ -354,7 +370,11 @@ class AppState:
                         for record in [r for r in statuses if r['id'] in ids]:
                             scoped=value
                             if module in ('living','education','health','dining','facility_reviews'):
-                                scoped={**value,'items':[i for i in value.get('items',[]) if i['facility_id'] in record['facility_ids']]}
+                                scoped={**value,'items':[i for i in value.get('items',[]) if i['facility_id'] in record['facility_ids'] or i.get('web_discovery')]}
+                                discovered_ids=[i['facility_id'] for i in scoped['items'] if i.get('web_discovery') and i.get('excerpts')]
+                                if discovered_ids:
+                                    record['discovered_facility_ids']=discovered_ids
+                                    record['discovery_scope']='진주시 공개 웹 · 집별 거리/생활권 적용 미확인'
                             elif module=='leisure' and record['criterion_ids']:
                                 scoped={**value,'discoveries':[i for i in value.get('discoveries',[]) if i.get('criterion_id') in record['criterion_ids']]}
                             mark([record['id']],'completed',
@@ -366,7 +386,7 @@ class AppState:
                             raise RunnerError('cancelled')
                         code=error.code if isinstance(error,RunnerError) else 'research_failed'
                         result['errors'].append({'module':module,'code':code});mark(ids,'failed',code)
-                    result['steps'].append({'module':module,**runner.last_metadata})
+                    result['steps'].append({'module':module,'stage':stage,**runner.last_metadata})
                 result['requests']=statuses
                 return result
             return self.start_job(session,SupplementInput(request_id=request_id,run_id=run_id),
@@ -392,7 +412,10 @@ class AppState:
             enriched = self.enrich(run, data.profile, data.candidates)
         targets=self.safety_index.research_targets(data.profile,data.candidates)
         leisure_scope=self.leisure_index.hobby_scope(data.profile,data.candidates) if context_value(data.profile,'leisure_research')=='requested' else None
-        plan=build_research_plan(data.profile,data.candidates,enriched,targets,leisure_scope,self.education_index)
+        plan=build_research_plan(data.profile,data.candidates,enriched,targets,leisure_scope,self.education_index,self.index)
+        for task in plan['tasks']:
+            if task.get('research_kind')=='facility_fact':
+                task['discovery_areas']=sorted({area['name'] for c in data.candidates if (area:=self.safety_index.area(c))})
         if run.get('report') is None:
             for r in plan['requests']:
                 if r['status']=='queued':r.update(status='not_executed',reason='needs_input')

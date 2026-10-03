@@ -111,7 +111,7 @@ class EducationTests(unittest.TestCase):
         state=AppState(index(), Runner, education_index=education(facility('school:a','school'),facility('academy:a')))
         _,session=state.session()
         p=education_profile(settings())
-        with patch('app.web.research_reviews',return_value={'items':[],'score_eligible':False}) as search:
+        with patch('app.web.research_reviews',return_value={'items':[],'score_eligible':False}) as search, patch('app.web.research_facility_facts',new=search):
             run=state.compare(session,CompareInput(profile=p,candidates=candidates()))
             self.assertNotIn('research_job',run); self.assertEqual(search.call_count,0)
             p=education_profile(settings(qualitative_research=True))

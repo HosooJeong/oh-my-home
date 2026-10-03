@@ -2,6 +2,7 @@ import json,time,unittest
 from threading import Event
 from types import SimpleNamespace
 from unittest.mock import patch
+from contextlib import contextmanager
 from app.contracts import ContextFact,NeedProfile,output_schema
 from app.codex_runner import RunnerError
 from app.intake import IntakeDraft
@@ -50,6 +51,13 @@ def wait_job(app,session):
     return app.public_job(job)
 
 
+@contextmanager
+def patch_research(**kwargs):
+    # Both independently routed researchers use the same controlled fixture for execution-state tests.
+    with patch('app.web.research_reviews',**kwargs) as tool, patch('app.web.research_facility_facts',new=tool):
+        yield tool
+
+
 class HousingScopeTests(unittest.TestCase):
     def test_profile_filters_are_applied_and_reference_never_changes_scores(self):
         m=HousingModule(HousingIndex(document()));p=query_profile()
@@ -95,11 +103,38 @@ class HousingScopeTests(unittest.TestCase):
 
 
 class RequestExecutionTests(unittest.TestCase):
+    def test_no_registered_facilities_searches_public_web_without_empty_registry_call(self):
+        app=AppState(index(),lambda:SimpleNamespace(last_metadata={}),education_index=education())
+        _,session=app.session();p=education_profile(settings(include_school=False,qualitative_research=True))
+        with patch('app.web.research_facility_facts') as registry,patch('app.web.discover_facility_facts',return_value={'items':[]}) as discovery:
+            app.compare(session,CompareInput(profile=p,candidates=candidates()));done=wait_job(app,session)
+        self.assertFalse(registry.called);self.assertEqual(discovery.call_count,1)
+        self.assertEqual(done['status'],'completed')
+        self.assertEqual(done['request_statuses'][0]['status'],'completed')
+        self.assertEqual(done['request_statuses'][0]['evidence_status'],'not_found')
+        self.assertEqual([s['stage'] for s in done['result']['steps']],['facility_discovery'])
+
+    def test_empty_registered_facts_trigger_one_web_discovery_and_keep_scores_unchanged(self):
+        app=state();_,session=app.session();p=research_profile()
+        def discover(runner,module,questions,**kw):
+            self.assertEqual(module,'education');self.assertNotIn('latitude',str(questions))
+            return {'items':[{'facility_id':'web_academy','web_discovery':True,'status':'found',
+                'excerpts':[{'quote':'fixture','request_ids':[q['request_id'] for q in questions]}]}],
+                'facilities':{'web_academy':{'id':'web_academy','name':'가상학원','kind':'academy','address':'진주시 가상로 1'}},
+                'response_validation':{'status':'completed'}}
+        with patch_research(return_value={'items':[]}),patch('app.web.discover_facility_facts',side_effect=discover) as tool:
+            run=app.compare(session,CompareInput(profile=p,candidates=candidates()));done=wait_job(app,session)
+        self.assertEqual(tool.call_count,1)
+        request=next(r for r in done['request_statuses'] if r['module']=='education')
+        self.assertEqual(request['evidence_status'],'found');self.assertEqual(request['discovered_facility_ids'],['web_academy'])
+        self.assertIn('미확인',request['discovery_scope'])
+        self.assertEqual(run['report'],session['comparison'][2]['report'])
+
     def test_living_and_education_both_run_with_distinct_original_questions(self):
         app=state();_,session=app.session();p=research_profile();seen=[]
         def search(runner,shops,**kw):
             seen.append((shops,kw));return {'items':[{'facility_id':s['id'],'excerpts':[],'status':'not_found'} for s in shops]}
-        with patch('app.web.research_reviews',side_effect=search):
+        with patch_research(side_effect=search):
             run=app.compare(session,CompareInput(profile=p,candidates=candidates()));done=wait_job(app,session)
         self.assertEqual({s[0][0]['kind'] for s in seen},{'shops','academy'})
         self.assertEqual(len(seen),2);self.assertEqual(len(done['result']['items']),2)
@@ -118,7 +153,7 @@ class RequestExecutionTests(unittest.TestCase):
         def search(runner,shops,**kw):
             if shops[0]['kind']=='shops':raise RunnerError('timeout')
             return {'items':[{'facility_id':shops[0]['id'],'excerpts':[],'status':'not_found'}]}
-        with patch('app.web.research_reviews',side_effect=search):
+        with patch_research(side_effect=search):
             run=app.compare(session,CompareInput(profile=p,candidates=candidates()));done=wait_job(app,session)
         by={r['module']:r for r in done['request_statuses']}
         self.assertEqual(by['living']['status'],'failed');self.assertEqual(by['living']['reason'],'timeout')
@@ -129,7 +164,7 @@ class RequestExecutionTests(unittest.TestCase):
         for changes in [('living_research_facility','확인되지 않은 매장'),('living_research_target','병원')]:
             app=state();_,session=app.session();p=profile();q='필요한 시설 정보를 찾아줘.'
             fact(p,'living_research_question',q,q);fact(p,changes[0],changes[1],q)
-            with patch('app.web.research_reviews') as search:
+            with patch_research() as search:
                 r=app.compare(session,CompareInput(profile=p,candidates=candidates()))
             self.assertFalse(search.called);self.assertNotIn('research_job',r)
             self.assertEqual(r['research_plan']['requests'][0]['status'],'not_executed')
@@ -142,7 +177,7 @@ class RequestExecutionTests(unittest.TestCase):
         academy=next(c for c in p.criteria if c.metric=='academy_count_within_radius');academy.parameters['subject']='math'
         quote=next(f.source_quote for f in p.context if f.key=='education_research_question')
         fact(p,'education_research_subject','english',quote);selected=[]
-        with patch('app.web.research_reviews',side_effect=lambda runner,rows,**kw:selected.extend(rows) or {'items':[]}):
+        with patch_research(side_effect=lambda runner,rows,**kw:selected.extend(rows) or {'items':[]}):
             run=app.compare(session,CompareInput(profile=p,candidates=candidates()));wait_job(app,session)
         self.assertIn('academy:english',[r['id'] for r in selected]);self.assertNotIn('academy:math',[r['id'] for r in selected])
         self.assertEqual(academy.parameters['subject'],'math')
@@ -151,7 +186,7 @@ class RequestExecutionTests(unittest.TestCase):
     def test_subject_mismatch_without_query_scope_is_not_a_generic_other_subject_search(self):
         app=state();_,session=app.session();p=research_profile()
         next(c for c in p.criteria if c.metric=='academy_count_within_radius').parameters['subject']='math'
-        with patch('app.web.research_reviews',return_value={'items':[]}):
+        with patch_research(return_value={'items':[]}):
             run=app.compare(session,CompareInput(profile=p,candidates=candidates()));done=wait_job(app,session)
         education_request=next(r for r in done['request_statuses'] if r['module']=='education')
         self.assertEqual(education_request['reason'],'subject_scope_unconfirmed')
@@ -172,7 +207,7 @@ class RequestExecutionTests(unittest.TestCase):
         app=state();_,session=app.session();p=research_profile();started=Event()
         def search(runner,rows,**kw):
             started.set();kw['cancel'].wait(2);raise RunnerError('cancelled')
-        with patch('app.web.research_reviews',side_effect=search) as tool:
+        with patch_research(side_effect=search) as tool:
             run=app.compare(session,CompareInput(profile=p,candidates=candidates()));self.assertTrue(started.wait(1))
             session['review_job']['cancel'].set();done=wait_job(app,session)
         self.assertEqual(tool.call_count,1);self.assertEqual(done['status'],'cancelled')
@@ -181,7 +216,7 @@ class RequestExecutionTests(unittest.TestCase):
 
     def test_reweight_reuses_requests_without_new_search(self):
         app=state();_,session=app.session();p=research_profile()
-        with patch('app.web.research_reviews',return_value={'items':[]}) as tool:
+        with patch_research(return_value={'items':[]}) as tool:
             run=app.compare(session,CompareInput(profile=p,candidates=candidates()));wait_job(app,session)
             revised=app.preferences(session,PreferenceInput(run_id=run['run_id'],group_weights={},criterion_importance={},confirm_weights=True))
         self.assertEqual(tool.call_count,2);self.assertEqual(revised['run']['research_plan'],run['research_plan'])
@@ -193,7 +228,7 @@ class RequestExecutionTests(unittest.TestCase):
             fact(p,'living_research_question',q,q);fact(p,'living_research_target',target,q)
         def search(runner,rows,**kw):
             return {'items':[{'facility_id':r['id'],'excerpts':[{'quote':'fixture','request_ids':[q['request_id'] for q in kw['questions'] if r['id'] in q['facility_ids']]}] if r['id']=='shops:a' else [],'status':'not_found'} for r in rows]}
-        with patch('app.web.research_reviews',side_effect=search):
+        with patch_research(side_effect=search):
             app.compare(session,CompareInput(profile=p,candidates=candidates()));done=wait_job(app,session)
         by={r['question']:r['evidence_status'] for r in done['request_statuses']}
         self.assertEqual(by,{'마트 알레르기 표기':'found','편의점 휠체어 출입':'not_found'})
@@ -201,7 +236,7 @@ class RequestExecutionTests(unittest.TestCase):
     def test_manual_review_also_forwards_original_question(self):
         app=state();_,session=app.session();p=research_profile();cs=candidates();run=app.orchestrator.run(p,cs)
         session['comparison']=(p,cs,run);session['review_key']=run['run_id'];seen=[]
-        with patch('app.web.research_reviews',side_effect=lambda runner,rows,**kw:seen.append(kw) or {'items':[]}):
+        with patch_research(side_effect=lambda runner,rows,**kw:seen.append(kw) or {'items':[]}):
             app.reviews(session,ReviewInput(request_id='manual',run_id=run['run_id'],facility_ids=['shops:a']));wait_job(app,session)
         self.assertIn('알레르기',seen[0]['questions'][0]['question'])
 
@@ -230,7 +265,7 @@ class RequestExecutionTests(unittest.TestCase):
     def test_private_or_missing_original_question_is_not_sent_as_generic_research(self):
         for q in ('내 집 가상로 23에서 가까운 시설','문의 번호 010-1234-5678'):
             app=state();_,session=app.session();p=profile();fact(p,'living_research_question',q)
-            with patch('app.web.research_reviews') as tool:r=app.compare(session,CompareInput(profile=p,candidates=candidates()))
+            with patch_research() as tool:r=app.compare(session,CompareInput(profile=p,candidates=candidates()))
             self.assertFalse(tool.called);self.assertEqual(r['research_plan']['requests'][0]['reason'],'private_question_requires_public_summary')
 
 
