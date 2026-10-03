@@ -135,7 +135,7 @@ class ReviewJobTests(unittest.TestCase):
             def run(self,*args,**kwargs):
                 started.set();released.wait(3)
                 return ReviewResponse(items=[StoreReviews(facility_id="shops:a",excerpts=[])])
-        self.runner=Delayed();self.state=AppState(index(),lambda:self.runner)
+        self.runner=Delayed();self.state=AppState(index(),lambda:self.runner,llm_settings=ModelSettings(provider='codex'))
         _,self.session=self.state.session()
         self.run=self.state.compare(self.session,CompareInput(profile=profile(),candidates=candidates()))
         self.data=ReviewInput(request_id="review1",run_id=self.run["run_id"],facility_ids=["shops:a"])
@@ -173,3 +173,4 @@ class ReviewJobTests(unittest.TestCase):
         self.start();self.session["review_job"]["cancel"].set();self.released.set();self.wait()
         job=self.state.reviews(self.session,self.data)
         self.assertEqual(job["status"],"cancelled");self.assertIsNone(job["result"])
+from app.llm_settings import ModelSettings

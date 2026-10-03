@@ -20,14 +20,13 @@ python -X utf8 -m app schema --output work/needs-schema.json
 
 가상 예제는 같은 사실에서 교통/비용 중요도를 70/30→30/70으로 바꾼다. A/B 점수가 75/62→55/78로 달라진다. 모델/네트워크 호출은 없다.
 
-현재 ChatGPT 계정으로 로그인된 Codex CLI를 사용해 가상 니즈를 정리하려면:
+기본 OpenAI API로 니즈를 정리하려면 루트 `.env` 또는 프로세스 환경변수에 본인 API 키를 설정한다. [AI 설정 안내](../docs/llm-settings.md).
 
 ~~~powershell
-codex login status
-python -X utf8 -m app intake --request-file examples/intake-request.txt --output work/profile-1.json
+python -X utf8 -m app intake --env-file .env --request-file examples/intake-request.txt --output work/profile-1.json
 ~~~
 
-별도 OpenAI API 키를 요구하지 않는다. 구독 사용량과 인터넷 연결은 필요하다. 실제 사용자 입력/응답 파일은 로컬 `work/` 등 Git 제외 경로에 두고 공유하지 않는다. 출력 파일이 이미 있으면 덮어쓰지 않으므로 다음 버전 이름을 쓴다.
+유효 OpenAI API 키·모델 권한과 인터넷 연결이 필요하며 API 사용량이 발생한다. Codex를 선택하려면 CLI에 `--provider codex --model gpt-6.1-sol --reasoning-effort medium`을 지정하고 미리 로그인한다. 실제 사용자 입력/응답 파일은 로컬 `work/` 등 Git 제외 경로에 두고 공유하지 않는다. 출력 파일이 이미 있으면 덮어쓰지 않으므로 다음 버전 이름을 쓴다.
 
 인터뷰 답변 파일은 `[ {"question_id":"실제 질문 id", "answer":"사용자 답변"} ]` 형식이다. 답변에 원문 요청을 다시 써야 하는 것은 아니다.
 
@@ -49,7 +48,7 @@ python -X utf8 -m app preferences --profile work/profile-2.json --patch work/wei
 python -X utf8 -m app probe-search --output work/search-probe.json
 ~~~
 
-이 명령은 검색 이벤트가 없으면 실패 처리한다. 분야별 웹검색 어댑터·검색 예산 집행·운영시간 검증을 구현한 것은 아니다. 검색 조회는 구독 사용량을 크게 늘릴 수 있어 일반 니즈 정리에서는 끈다.
+이 명령은 검색 이벤트가 없으면 실패 처리한다. 분야별 웹검색 어댑터·검색 예산 집행·운영시간 검증을 구현한 것은 아니다. 검색 조회는 선택한 제공자의 사용량을 늘릴 수 있어 일반 니즈 정리에서는 끈다.
 
 ## 코드 경계
 
@@ -66,11 +65,11 @@ M3 집·비용은 [과거 아파트 거래 참고 모듈](../docs/housing-refere
 
 ## Codex 실행 범위
 
-Windows에서는 npm `codex.cmd` 패키지의 네이티브 실행 파일을 우선 찾는다. 데스크톱 앱의 별도 구버전 실행 파일과 혼동하지 않게 한다. 자동 탐색이 안 되면 `--codex`로 네이티브 실행 파일 경로를 지정할 수 있다. 현재 기본 모델을 임의로 고정하지 않으며 명시적 변경이 필요하면 `--model`을 사용한다. 실제 응답의 정확한 모델 ID가 노출되지 않으면 미확인으로 기록한다.
+Windows에서는 확인한 설치 버전 중 최신 Codex CLI를 선택하며 서버 프로세스 동안 캐시한다. 자동 탐색이 안 되면 `--codex`로 네이티브 실행 파일 경로를 지정할 수 있다. 기본 요청 모델/강도는 `gpt-6.1-sol`/`medium`이고 명시적 변경은 `--model`/`--reasoning-effort`를 사용한다. 실제 응답의 정확한 모델 ID가 노출되지 않으면 미확인으로 기록한다.
 
 `--ignore-user-config`, 임시 작업 폴더, 읽기 전용, 검색 기본 비활성, 셸/MCP 사용자 설정/플러그인/서브에이전트 등 불필요한 기능 제외를 사용한다. `OPENAI_API_KEY`·현재 대화 식별자는 자식 환경에 전달하지 않는다. 인증 위치는 기존 계정을 사용하며 인증 파일을 복사하거나 로그에 적지 않는다. JSONL 이벤트와 최종 출력 파일은 분리하고, 메타데이터에 이벤트 종류·검색 횟수·토큰 수·시간만 저장한다. 내부 사고 내용·일반 이벤트 원문은 저장하지 않는다.
 
-이는 앱 호출 설정이며 OS 전체의 보안 격리를 보장하지 않는다. 예상하지 못한 실행/파일변경/MCP 이벤트를 발견하면 결과를 거절하지만 그 검사가 이미 일어난 도구 동작을 되돌리지는 않는다. 아직 공개 HTTP 모델 실행 API를 노출하지 않는다. 카카오 키와 Local 응답을 모델 입력에 넣지 않는다.
+이는 앱 호출 설정이며 OS 전체의 보안 격리를 보장하지 않는다. 예상하지 못한 실행/파일변경/MCP 이벤트를 발견하면 결과를 거절하지만 그 검사가 이미 일어난 도구 동작을 되돌리지는 않는다. 로컬 HTTP API는 세션·동일 Origin을 검사하며 인터넷 공개 운영용 인증은 제공하지 않는다. 카카오 키와 Local 응답을 모델 입력에 넣지 않는다.
 
 실측·실패/수정 이력은 상위 프로젝트의 `docs/project-records/validation.md`와 `work/saljari-evidence/20260930/`에서 관리한다. 기준 문서를 코드 저장소에 중복 복사하지 않는다.
 

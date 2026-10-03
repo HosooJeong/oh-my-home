@@ -1,3 +1,4 @@
+from app.llm_settings import ModelSettings
 from datetime import timedelta
 from threading import Event
 from types import SimpleNamespace
@@ -136,7 +137,7 @@ class SafetyTests(unittest.TestCase):
 
     def test_one_automatic_research_task_returns_to_comparison(self):
         runner=SimpleNamespace(last_metadata={'web_search_count':1})
-        state=AppState(index(),runner_factory=lambda:runner,safety_index=snapshot(cctv('a')))
+        state=AppState(index(),runner_factory=lambda:runner,llm_settings=ModelSettings(provider='codex'),safety_index=snapshot(cctv('a')))
         _,session=state.session();p=safety_profile(settings(qualitative_research=True))
         with patch('app.web.research_safety',return_value={'items':[],'score_eligible':False}) as search:
             run=state.compare(session,CompareInput(profile=p,candidates=candidates()))
@@ -153,7 +154,7 @@ class SafetyTests(unittest.TestCase):
     def test_failed_facility_research_does_not_skip_safety_or_discard_prior_success(self):
         for fail in ('facility_reviews','safety'):
             runner=SimpleNamespace(last_metadata={'web_search_count':1})
-            state=AppState(index(),runner_factory=lambda:runner,safety_index=snapshot(cctv('a')))
+            state=AppState(index(),runner_factory=lambda:runner,llm_settings=ModelSettings(provider='codex'),safety_index=snapshot(cctv('a')))
             _,session=state.session();p=safety_profile(settings())
             run=state.compare(session,CompareInput(profile=p,candidates=candidates()))
             with patch('app.web.research_reviews',side_effect=RunnerError('timeout') if fail=='facility_reviews' else None,

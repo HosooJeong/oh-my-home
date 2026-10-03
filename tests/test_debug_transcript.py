@@ -1,3 +1,4 @@
+from app.llm_settings import ModelSettings
 import json
 from pathlib import Path
 import tempfile
@@ -40,7 +41,7 @@ class DebugTranscriptTests(unittest.TestCase):
     def test_failed_job_keeps_error_elapsed_and_validation_location(self):
         class FailedRunner:
             def __init__(self):self.last_metadata={'elapsed_seconds':1.2,'validation_errors':[{'location':['criteria',0],'type':'value_error'}]}
-        state=AppState(ShopIndex({'generated_at':'fixture','records':[]}),runner_factory=FailedRunner,debug_transcripts=DebugTranscripts(self.directory))
+        state=AppState(ShopIndex({'generated_at':'fixture','records':[]}),runner_factory=FailedRunner,llm_settings=ModelSettings(provider='codex'),debug_transcripts=DebugTranscripts(self.directory))
         token,session=state.session()
         def fail(runner,cancel):
             runner.on_debug_event('AI 최종 응답', '{"answer":null}')

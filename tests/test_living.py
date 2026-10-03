@@ -1,3 +1,4 @@
+from app.llm_settings import ModelSettings
 import json
 from pathlib import Path
 from threading import Event, Thread
@@ -158,6 +159,7 @@ class WebStateTests(unittest.TestCase):
                 released.wait(3)
                 return profile()
         self.state.runner_factory = Runner
+        self.session['llm_settings'] = ModelSettings(provider='codex')
         data = IntakeInput(request_id="job1", request=profile().request)
         self.state.intake(self.session, data)
         self.assertTrue(started.wait(2))

@@ -4,7 +4,7 @@
 <body><header><a class="brand" href="/" aria-label="주거 의사결정 AI Agent oh-my-home"><span class="brand-title">주거 의사결정 AI Agent</span><span class="brand-subtitle">oh-my-home</span></a><button id="settings-back" type="button" class="plain">돌아가기</button></header>
 <main><h1>AI 설정</h1><p id="current-model" class="current" aria-live="polite">설정을 불러오는 중이에요.</p>
 <form id="model-form"><fieldset id="model-fields" disabled>
- <label for="ai-provider">연결 방식</label><select id="ai-provider"><option value="codex">Codex 로그인</option><option value="openai">OpenAI API</option></select>
+ <label for="ai-provider">연결 방식</label><select id="ai-provider"><option value="openai">OpenAI API</option><option value="codex">Codex 로그인</option></select>
  <div id="api-key-section" hidden><label for="ai-key">API 키</label><input id="ai-key" type="password" maxlength="512" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="API 키 입력"><div class="key-actions"><span id="key-state"></span><button id="remove-key" type="button" class="plain" hidden>키 삭제</button></div><p class="hint">키는 서버의 세션 메모리에만 보관해요. 서버 재시작·세션 만료 시 사라져요.</p></div>
  <label for="ai-model">모델</label><div class="model-row"><input id="ai-model" maxlength="100" list="ai-models" autocomplete="off" spellcheck="false" required><button id="load-models" type="button" class="secondary" hidden>모델 불러오기</button></div><datalist id="ai-models"></datalist>
  <label for="ai-effort">추론 강도</label><select id="ai-effort"></select><p class="hint">모델에 따라 지원하는 강도가 달라요.</p>

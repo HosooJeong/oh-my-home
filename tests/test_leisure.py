@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import patch
 
 from app.contracts import NeedProfile, Evidence, ContextFact, output_schema
+from app.llm_settings import ModelSettings
 from app.modules.leisure import LeisureIndex, LeisureModule, PARK_SOURCE, LIBRARY_SOURCE, SHOP_SOURCE
 from app.leisure_preferences import LeisureInput, leisure_profile
 from app.leisure_research import (FoundFacility, LeisureResearchResponse, research_leisure, public_url, fetch_page)
@@ -182,7 +183,7 @@ class LeisureTests(unittest.TestCase):
 
     def test_conditional_main_pipeline_and_reweight_reuse(self):
         class Runner: last_metadata={'fixture':True}
-        state=AppState(index(),Runner,leisure_index=leisure(facility()));_,session=state.session()
+        state=AppState(index(),Runner,llm_settings=ModelSettings(provider='codex'),leisure_index=leisure(facility()));_,session=state.session()
         p=leisure_profile(settings());run=state.compare(session,CompareInput(profile=p,candidates=candidates()))
         self.assertNotIn('research_job',run)
         p=leisure_profile(settings(include_hobby=True));
@@ -199,7 +200,7 @@ class LeisureTests(unittest.TestCase):
 
     def test_failed_other_supplement_does_not_skip_hobby(self):
         class Runner: last_metadata={}
-        state=AppState(index(),Runner,leisure_index=leisure(facility()));_,session=state.session()
+        state=AppState(index(),Runner,llm_settings=ModelSettings(provider='codex'),leisure_index=leisure(facility()));_,session=state.session()
         p=leisure_profile(settings(include_hobby=True))
         p.context.append(ContextFact(key='safety_research',value='requested',source_quote=p.request))
         p.context.append(ContextFact(key='safety_research_question',value='침수 피해와 완료된 조치 자료를 찾아줘.',source_quote=p.request))

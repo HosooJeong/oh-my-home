@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import patch
 
 from app.contracts import Criterion, UtilityRule, output_schema, NeedProfile
+from app.llm_settings import ModelSettings
 from app.education_preferences import EducationInput, education_profile
 from app.evaluation import utility
 from app.modules.education import EducationIndex, EducationModule, SCHOOL_SOURCE, ACADEMY_SOURCE
@@ -108,7 +109,7 @@ class EducationTests(unittest.TestCase):
     def test_conditional_search_follows_facts_and_reweight_reuses_results(self):
         class Runner:
             last_metadata={'fixture':True}
-        state=AppState(index(), Runner, education_index=education(facility('school:a','school'),facility('academy:a')))
+        state=AppState(index(), Runner, llm_settings=ModelSettings(provider='codex'), education_index=education(facility('school:a','school'),facility('academy:a')))
         _,session=state.session()
         p=education_profile(settings())
         with patch('app.web.research_reviews',return_value={'items':[],'score_eligible':False}) as search, patch('app.web.research_facility_facts',new=search):

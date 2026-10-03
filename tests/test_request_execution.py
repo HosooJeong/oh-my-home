@@ -1,3 +1,4 @@
+from app.llm_settings import ModelSettings
 import json,time,unittest
 from threading import Event
 from types import SimpleNamespace
@@ -40,7 +41,7 @@ def research_profile():
 
 
 def state():
-    return AppState(index(),lambda:SimpleNamespace(last_metadata={'fixture':True}),education_index=education(
+    return AppState(index(),lambda:SimpleNamespace(last_metadata={'fixture':True}),llm_settings=ModelSettings(provider='codex'),education_index=education(
         facility('academy:english',subjects=['english'],subject_levels={'english':['elementary']}),facility('academy:math')))
 
 
@@ -122,7 +123,7 @@ class RequestExecutionTests(unittest.TestCase):
         self.assertEqual(run['report'],session['comparison'][2]['report'])
 
     def test_no_registered_facilities_searches_public_web_without_empty_registry_call(self):
-        app=AppState(index(),lambda:SimpleNamespace(last_metadata={}),education_index=education())
+        app=AppState(index(),lambda:SimpleNamespace(last_metadata={}),llm_settings=ModelSettings(provider='codex'),education_index=education())
         _,session=app.session();p=education_profile(settings(include_school=False,qualitative_research=True))
         with patch('app.web.research_facility_facts') as registry,patch('app.web.discover_facility_facts',return_value={'items':[]}) as discovery:
             app.compare(session,CompareInput(profile=p,candidates=candidates()));done=wait_job(app,session)
@@ -273,7 +274,7 @@ class RequestExecutionTests(unittest.TestCase):
         base=next(c for c in p.criteria if c.metric=='hobby_suitability')
         for n in range(3):
             c=base.model_copy(deep=True);c.id='hobby_extra_'+str(n);c.need='헬스 자율 이용 조건 '+str(n);p.criteria.append(c)
-        app=AppState(index(),lambda:SimpleNamespace(last_metadata={}),leisure_index=leisure(hobby_facility()))
+        app=AppState(index(),lambda:SimpleNamespace(last_metadata={}),llm_settings=ModelSettings(provider='codex'),leisure_index=leisure(hobby_facility()))
         _,session=app.session()
         with patch('app.web.research_leisure',return_value={'discoveries':[]}):
             run=app.compare(session,CompareInput(profile=p,candidates=candidates()));done=wait_job(app,session)

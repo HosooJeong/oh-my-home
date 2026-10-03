@@ -3,13 +3,14 @@ import json
 from pathlib import Path
 import threading
 import time
+import tempfile
 import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from app.codex_runner import RunnerError
-from app.llm_settings import ModelSettings
+from app.llm_settings import ModelSettings, server_settings
 from app.web import AppState, IntakeInput, make_handler
 from test_living import index
 
@@ -17,6 +18,52 @@ KEY='sk-test-only-not-a-real-key'
 
 
 class SettingsTests(unittest.TestCase):
+    def test_default_api_has_no_implicit_codex_fallback_without_a_key(self):
+        settings=ModelSettings()
+        self.assertEqual(settings.public(), {'provider':'openai','model':'gpt-6.1-sol',
+            'effort':'medium','key_configured':False,'ready':False})
+        with patch('app.openai_runner.http.client.HTTPSConnection') as network:
+            with patch('app.llm_settings.CodexRunner') as codex:
+                with self.assertRaisesRegex(RunnerError,'api_key_missing'):
+                    settings.runner(codex)
+                codex.assert_not_called();network.assert_not_called()
+
+    def test_server_template_preserves_process_key_and_explicit_codex_selection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'.env'
+            path.write_text('SALJARI_LLM_PROVIDER=openai\nOPENAI_API_KEY=\n',encoding='utf-8')
+            with patch.dict('os.environ',{'OPENAI_API_KEY':KEY},clear=True):
+                settings=server_settings(path)
+                self.assertTrue(settings.public()['ready'])
+                self.assertEqual(settings.api_key,KEY)
+                self.assertNotIn(KEY,json.dumps(settings.public()))
+            path.write_text('SALJARI_LLM_PROVIDER=codex\n',encoding='utf-8')
+            with patch.dict('os.environ',{},clear=True):
+                self.assertEqual(server_settings(path).provider,'codex')
+            with patch.dict('os.environ',{'SALJARI_LLM_PROVIDER':'openai'},clear=True):
+                self.assertEqual(server_settings(path).provider,'openai')
+
+    def test_default_intake_job_uses_api_and_validates_structured_response(self):
+        from app.contracts import Contract
+        class Tiny(Contract):answer:str
+        app=AppState(index(),llm_settings=ModelSettings(api_key=KEY));_,session=app.session()
+        response={'status':'completed','output':[{'type':'message','role':'assistant',
+            'content':[{'type':'output_text','text':'{"answer":"확인"}'}]}]}
+        with patch('app.openai_runner.OpenAIRunner.request',return_value=response) as request:
+            with patch.object(app,'runner_factory') as codex:
+                job=app.start_job(session,IntakeInput(request_id='api_default',request='조건'),
+                    'intake',lambda runner,cancel:runner.run('조건',Tiny,cancel=cancel).model_dump())
+                for _ in range(100):
+                    if session['jobs'][job['id']]['status']!='running':break
+                    time.sleep(.01)
+                actual=session['jobs'][job['id']]
+                self.assertEqual(actual['status'],'completed')
+                self.assertEqual(actual['profile'],{'answer':'확인'})
+                self.assertEqual(actual['metadata']['provider'],'openai')
+                self.assertEqual(request.call_args.args[:2],('POST','/v1/responses'))
+                codex.assert_not_called()
+                self.assertNotIn(KEY,json.dumps(app.public_job(actual)))
+
     def test_key_is_neither_public_nor_in_repr_and_deletion_is_explicit(self):
         a=ModelSettings().updated({'provider':'openai','api_key':KEY})
         self.assertTrue(a.public()['ready'])
@@ -36,7 +83,7 @@ class SettingsTests(unittest.TestCase):
     def test_selection_is_session_local_and_running_job_retains_snapshot(self):
         app=AppState(index());_,a=app.session();_,b=app.session()
         app.model_settings(a,{'provider':'openai','api_key':KEY,'model':'custom-api-model','effort':'auto'})
-        self.assertEqual(app.model_settings(b)['provider'],'codex')
+        self.assertEqual(app.model_settings(b)['provider'],'openai')
         begun=threading.Event();release=threading.Event();seen=[]
         class Runner:
             last_metadata={'provider':'openai','requested_model':'custom-api-model'}
@@ -111,7 +158,7 @@ class SettingsHTTPTests(unittest.TestCase):
         _,boot=self.request('/api/bootstrap',token=token)
         self.assertEqual(boot['llm']['provider'],'openai');self.assertNotIn(KEY,json.dumps(boot))
         _,other=self.request('/api/llm/settings',token=second['token'])
-        self.assertFalse(other['key_configured']);self.assertEqual(other['provider'],'codex')
+        self.assertFalse(other['key_configured']);self.assertEqual(other['provider'],'openai')
         _,deleted=self.request('/api/llm/settings',{'remove_key':True},token)
         self.assertFalse(deleted['ready'])
 

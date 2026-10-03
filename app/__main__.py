@@ -1,13 +1,14 @@
-"""P0 command-line entrypoints. No public model-execution HTTP endpoint."""
+"""AI intake, search diagnostics, and offline profile tools."""
 import argparse
 import json
 from pathlib import Path
 import sys
 
-from .codex_runner import CodexRunner, RunnerError, DEFAULT_MODEL, DEFAULT_REASONING_EFFORT, REASONING_EFFORTS
+from .codex_runner import RunnerError, REASONING_EFFORTS
 from .contracts import Contract, InterviewTurn, NeedProfile, output_schema
 from .intake import prepare_profile
 from .preferences import update_preferences
+from .llm_settings import API_EFFORTS, server_settings
 
 
 class SearchProbe(Contract):
@@ -25,9 +26,11 @@ def main():
     for p in (intake, sub.add_parser("probe-search", help="공식 문서 검색 지원 확인용; 카테고리 검색 구현 아님")):
         p.add_argument("--output", type=Path, required=True)
         p.add_argument("--timeout", type=float, default=120)
-        p.add_argument("--model", default=DEFAULT_MODEL)
-        p.add_argument("--reasoning-effort", default=DEFAULT_REASONING_EFFORT, choices=REASONING_EFFORTS)
-        p.add_argument("--codex", default=None)
+        p.add_argument("--env-file", type=Path, default=Path(__file__).resolve().parents[1] / '.env')
+        p.add_argument("--provider", choices=('openai', 'codex'), help='기본 OpenAI API; 환경 설정을 명시적으로 재정의')
+        p.add_argument("--model", default=None)
+        p.add_argument("--reasoning-effort", default=None, choices=tuple(dict.fromkeys((*API_EFFORTS, *REASONING_EFFORTS))))
+        p.add_argument("--codex", default=None, help='--provider codex에서 사용할 CLI 실행 파일')
     schema = sub.add_parser("schema")
     schema.add_argument("--output", type=Path, required=True)
     preferences = sub.add_parser("preferences", help="가중치 편집/확인; 모델을 호출하지 않음")
@@ -48,8 +51,10 @@ def main():
                 raise ValueError("invalid preference patch")
             result = update_preferences(profile, **patch).model_dump()
         else:
-            runner = CodexRunner(args.codex, timeout=args.timeout, model=args.model,
-                                 reasoning_effort=args.reasoning_effort)
+            settings = server_settings(args.env_file).updated({k: v for k, v in
+                {'provider': args.provider, 'model': args.model, 'effort': args.reasoning_effort}.items()
+                if v is not None})
+            runner = settings.runner(timeout=args.timeout, codex=args.codex)
             if args.command == "intake":
                 request = args.request_file.read_text(encoding="utf-8").strip()
                 previous = NeedProfile.model_validate_json(args.previous.read_text(encoding="utf-8")) if args.previous else None

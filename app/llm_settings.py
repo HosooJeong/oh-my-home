@@ -12,7 +12,7 @@ MODEL_PATTERN = re.compile(r'[A-Za-z0-9][A-Za-z0-9_.:-]{0,99}')
 
 @dataclass(frozen=True)
 class ModelSettings:
-    provider: str = 'codex'
+    provider: str = 'openai'
     model: str = DEFAULT_MODEL
     effort: str = DEFAULT_REASONING_EFFORT
     api_key: str = field(default='', repr=False)
@@ -41,19 +41,21 @@ class ModelSettings:
         return replace(self, provider=provider, model=model, effort=effort,
                        api_key='' if remove else key or self.api_key)
 
-    def runner(self, default_factory=CodexRunner):
+    def runner(self, default_factory=CodexRunner, *, timeout=120, codex=None):
         if self.provider == 'openai':
+            if codex is not None:
+                raise RunnerError('unsupported_configuration')
             from .openai_runner import OpenAIRunner
-            return OpenAIRunner(self.api_key, self.model, self.effort)
-        # Preserve injected test runners and the original default behavior.
-        if self.model == DEFAULT_MODEL and self.effort == DEFAULT_REASONING_EFFORT:
+            return OpenAIRunner(self.api_key, self.model, self.effort, timeout=timeout)
+        # An explicitly selected Codex connection may use an injected runner.
+        if self.model == DEFAULT_MODEL and self.effort == DEFAULT_REASONING_EFFORT and timeout == 120 and codex is None:
             return default_factory()
-        return CodexRunner(model=self.model, reasoning_effort=self.effort)
+        return CodexRunner(codex, timeout=timeout, model=self.model, reasoning_effort=self.effort)
 
 
 def server_settings(path: Path):
     names = ('SALJARI_LLM_PROVIDER', 'SALJARI_LLM_MODEL', 'SALJARI_LLM_EFFORT', 'OPENAI_API_KEY')
-    values = {name: os.environ.get(name, '') for name in names}
+    values = {}
     try:
         for line in Path(path).read_text(encoding='utf-8-sig').splitlines():
             name, separator, value = line.partition('=')
@@ -61,5 +63,9 @@ def server_settings(path: Path):
                 values[name.strip()] = value.strip()
     except FileNotFoundError:
         pass
-    data = {k: values[name] for k, name in zip(('provider', 'model', 'effort', 'api_key'), names) if values[name]}
+    # Process settings override the local file, including a template's blank key.
+    for name in names:
+        if name in os.environ:
+            values[name] = os.environ[name]
+    data = {k: values[name] for k, name in zip(('provider', 'model', 'effort', 'api_key'), names) if values.get(name)}
     return ModelSettings().updated(data)
