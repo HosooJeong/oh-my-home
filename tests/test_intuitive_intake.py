@@ -38,6 +38,61 @@ class IntuitiveIntakeTests(unittest.TestCase):
         self.assertEqual(p.questions,[])
         self.assertTrue(all(any('두 곳' in q for b in c.source_evidence for q in b.quotes) for c in p.criteria))
 
+    def test_very_close_preference_is_a_reviewable_soft_proposal(self):
+        request='편의점이 집 코앞에 있으면 좋겠어요.'
+        c=criterion('convenience','convenience_straight_line_distance_m',
+                    need=request, importance_source='proposed',utility=None)
+        p=prepare_profile(FakeRunner(draft(criteria=[c],needs=[row(ids=('convenience',))])),request)
+        self.assertEqual(p.questions,[])
+        self.assertEqual((p.criteria[0].utility.ideal,p.criteria[0].utility.limit),(100,800))
+        self.assertEqual(p.criteria[0].comparison_proposal.label,'집 바로 가까이에 있으면 좋아요')
+        self.assertIsNone(p.criteria[0].hard)
+        self.assertEqual(p.criteria[0].source_quote,request)
+
+    def test_shared_quote_does_not_spread_strong_preference_to_other_facility(self):
+        request='편의점이 집 코앞이면 좋겠어요. 마트는 조금 멀어도 괜찮아요.'
+        response=self.living().model_dump()
+        response['criteria'][1]['need']='편의점이 집 코앞이면 좋겠어요'
+        p=prepare_profile(FakeRunner(type(self.living()).model_validate(response)),request)
+        self.assertEqual([(c.utility.ideal,c.utility.limit) for c in p.criteria],[(600,2500),(100,800)])
+
+    def test_model_cannot_intensify_an_ordinary_nearby_preference(self):
+        request='편의점이 가까우면 좋겠어요.'
+        c=criterion('convenience','convenience_straight_line_distance_m',
+                    need='편의점이 집 코앞이면 좋아요',importance_source='proposed',utility=None)
+        p=prepare_profile(FakeRunner(draft(criteria=[c],needs=[row(ids=('convenience',))])),request)
+        self.assertEqual((p.criteria[0].utility.ideal,p.criteria[0].utility.limit),(300,1500))
+
+    def test_original_strong_preference_survives_a_short_model_paraphrase(self):
+        request='편의점이 집 코앞에 있으면 좋겠어요.'
+        c=criterion('convenience','convenience_straight_line_distance_m',
+                    need='편의점 접근성',importance_source='proposed',utility=None)
+        p=prepare_profile(FakeRunner(draft(criteria=[c],needs=[row(ids=('convenience',))])),request)
+        self.assertEqual((p.criteria[0].utility.ideal,p.criteria[0].utility.limit),(100,800))
+
+    def test_another_facilitys_strong_preference_cannot_intensify_this_scale(self):
+        request='마트는 가까우면 좋고, 편의점은 집 코앞이면 좋겠어요.'
+        response=self.living().model_dump()
+        response['criteria'][0]['need']='마트 접근성'
+        response['criteria'][1]['need']='편의점 접근성'
+        p=prepare_profile(FakeRunner(type(self.living()).model_validate(response)),request)
+        self.assertEqual([(c.utility.ideal,c.utility.limit) for c in p.criteria],[(300,1500),(100,800)])
+
+    def test_two_named_facilities_can_share_one_strong_preference(self):
+        request='마트와 편의점이 집 코앞이면 좋겠어요.'
+        response=self.living().model_dump()
+        response['criteria'][0]['need']='마트 접근성'
+        response['criteria'][1]['need']='편의점 접근성'
+        p=prepare_profile(FakeRunner(type(self.living()).model_validate(response)),request)
+        self.assertEqual([(c.utility.ideal,c.utility.limit) for c in p.criteria],[(100,800),(100,800)])
+
+    def test_not_needing_a_store_at_the_door_does_not_select_strong_scale(self):
+        request='편의점이 집 코앞은 아니어도 괜찮아요.'
+        c=criterion('convenience','convenience_straight_line_distance_m',
+                    need=request,importance_source='proposed',utility=None)
+        p=prepare_profile(FakeRunner(draft(criteria=[c],needs=[row(ids=('convenience',))])),request)
+        self.assertEqual((p.criteria[0].utility.ideal,p.criteria[0].utility.limit),(300,1500))
+
     def test_explicit_distances_and_hard_limits_are_not_replaced_by_proposals(self):
         request='마트 직선거리 100m가 좋고 2000m면 만족도 0이에요. 700m 이내는 필수예요.'
         c=criterion(importance_source='proposed',utility=dict(direction='lower',ideal=100.0,limit=2000.0,unit='m'),

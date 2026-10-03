@@ -1,10 +1,33 @@
 """Optional app comparison scales for qualitative preferences, with visible provenance."""
 import re
 from .contracts import NeedProfile
-from .source_bindings import TARGETS, distance_values, numbers
+from .source_bindings import TARGETS, SUBJECT, distance_values, numbers
 
 DISTANCE_METRICS = set(TARGETS) - {'academy_count_within_radius'}
 COUNT_METRIC = 'academy_count_within_radius'
+
+CLOSE_PATTERN = re.compile(r'코앞|바로\s*앞|바로\s*(?:가까이|가까운|근처|곁)|(?:아주|매우)\s*가까')
+CLOSE_NEGATED = re.compile(r'(?:' + CLOSE_PATTERN.pattern + r').{0,12}(?:아니|않아도|없어도|부담|필요\s*없)')
+
+
+def very_close_preference(criterion, quotes):
+    """Read the facility's original clause, independent of model paraphrasing."""
+    for quote in quotes:
+        for match in re.finditer(TARGETS[criterion['metric']], quote):
+            rest = re.split(r'[.!?;\n]', quote[match.end():], maxsplit=1)[0]
+            next_subject = SUBJECT.search(rest)
+            if next_subject:
+                prefix = rest[:next_subject.start()]
+                if re.fullmatch(r'\s*(?:와|과|및|,|·|/)\s*', prefix):
+                    rest = rest[next_subject.end():]
+                    following = SUBJECT.search(rest)
+                    if following:
+                        rest = rest[:following.start()]
+                else:
+                    rest = prefix
+            if CLOSE_PATTERN.search(rest) and not CLOSE_NEGATED.search(rest):
+                return True
+    return False
 
 
 def restore_proposal_inputs(profile, previous, sources=None, needs=()):
@@ -54,9 +77,11 @@ def add_comparison_proposals(profile):
                 continue
             # Use the extracted single need, avoiding a combined clause's other facility.
             flexible = bool(re.search(r'멀어도|멀어져도|가까움보다|가까운 것보다', c['need']))
-            label = '조금 멀어도 괜찮아요' if flexible else '가까우면 좋아요'
-            rule = dict(direction='lower', ideal=600.0 if flexible else 300.0,
-                        limit=2500.0 if flexible else 1500.0, unit='m')
+            very_close = not flexible and very_close_preference(c, quotes)
+            label = ('조금 멀어도 괜찮아요' if flexible else
+                     '집 바로 가까이에 있으면 좋아요' if very_close else '가까우면 좋아요')
+            ideal, limit = (600.0, 2500.0) if flexible else (100.0, 800.0) if very_close else (300.0, 1500.0)
+            rule = dict(direction='lower', ideal=ideal, limit=limit, unit='m')
             radius = None
         elif c['metric'] == COUNT_METRIC:
             if re.search(r'\d+(?:\.\d+)?\s*(?:개소|곳|개)', text):
