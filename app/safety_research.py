@@ -111,7 +111,7 @@ def fetch_official_article(url, cancel):
     except Exception: return None
 
 
-INSTRUCTIONS = '''살자리의 안전·환경 공식 지역자료 보완 조사기다.
+INSTRUCTIONS = '''주거 의사결정 AI Agent의 안전·환경 공식 지역자료 보완 조사기다.
 입력에는 공개 행정동 이름/코드, 문제 종류와 비식별 기능 questions가 있다.
 각 행정동의 questions에 담긴 실제 요청 문제를 직접 웹검색하고 원문을 읽어라. 이를 범용 안전 소개로 대신하지 마라.
 제공처는 진주시청 www.jinju.go.kr의 개별 게시글이다. 전체 4회 이내 검색을 목표로 하라.

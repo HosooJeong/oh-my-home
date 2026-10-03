@@ -737,7 +737,7 @@ def main():
                      llm_settings=server_settings(args.env_file))
     server = ThreadingHTTPServer((args.host, args.port), make_handler(state, args.env_file))
     server.daemon_threads = True
-    print(f"Saljari M1/M2/M3/M4/M5/M6: http://localhost:{args.port} (bind {args.host})", flush=True)
+    print(f"주거 의사결정 AI Agent (oh-my-home): http://localhost:{args.port} (bind {args.host})", flush=True)
     if args.debug_transcripts:
         print(f'Test transcripts enabled: {args.debug_transcripts.resolve()}', flush=True)
     server.serve_forever()

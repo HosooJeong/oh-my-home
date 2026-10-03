@@ -5,3 +5,7 @@ body,input,textarea,select,button{font-family:var(--font-body)}
 h1,h2,h3,.brand{font-family:var(--font-display);font-weight:650;letter-spacing:-.025em;word-break:keep-all}
 body{letter-spacing:-.015em}p{line-height:1.65;word-break:keep-all;overflow-wrap:anywhere}button{font-weight:600}input,textarea{font-weight:400}
 [role=status]:empty,.quiet:empty,.location-note:empty{display:none}
+.brand{display:flex;flex-direction:column;gap:4px;line-height:1.2;min-width:0;letter-spacing:-.025em}
+.brand .brand-title{font-size:20px;font-weight:750;line-height:1.25;color:inherit}
+.brand .brand-subtitle{font-family:var(--font-body);font-size:12px;font-weight:500;letter-spacing:.08em;line-height:1.2;color:#738079;margin:0}
+@media(max-width:600px){.brand .brand-title{font-size:15px}.brand .brand-subtitle{font-size:10px}.app-header{gap:12px;padding-left:20px;padding-right:20px}.app-header>.text-button{flex-shrink:0}}
