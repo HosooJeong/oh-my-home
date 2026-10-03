@@ -103,6 +103,24 @@ class HousingScopeTests(unittest.TestCase):
 
 
 class RequestExecutionTests(unittest.TestCase):
+    def test_registry_course_facts_survive_and_do_not_suppress_additional_web_discovery(self):
+        app=state();_,session=app.session();p=research_profile()
+        def registered(runner,rows,**kw):
+            row=rows[0]
+            return {'items':[{'facility_id':row['id'],'excerpts':[{'registry_source':True,
+                'request_ids':[q['request_id'] for q in kw['questions']],'quote':'초등영어'}]}],
+                'facilities':{row['id']:{'id':row['id'],'name':row['name'],'kind':'academy'}}}
+        discovered={'items':[{'facility_id':'web_academy','web_discovery':True,'excerpts':[{'quote':'영어 안내'}]}],
+            'facilities':{'web_academy':{'id':'web_academy','name':'웹에서 찾은 학원','kind':'academy'}}}
+        with patch('app.web.research_reviews',return_value={'items':[]}),\
+             patch('app.web.research_facility_facts',side_effect=registered),\
+             patch('app.web.discover_facility_facts',return_value=discovered) as discovery:
+            run=app.compare(session,CompareInput(profile=p,candidates=candidates()));done=wait_job(app,session)
+        self.assertEqual(discovery.call_count,1)
+        self.assertTrue(any(x.get('registry_source') for i in done['result']['items'] for x in i['excerpts']))
+        self.assertIn('academy:english',done['result']['facilities']);self.assertIn('web_academy',done['result']['facilities'])
+        self.assertEqual(run['report'],session['comparison'][2]['report'])
+
     def test_no_registered_facilities_searches_public_web_without_empty_registry_call(self):
         app=AppState(index(),lambda:SimpleNamespace(last_metadata={}),education_index=education())
         _,session=app.session();p=education_profile(settings(include_school=False,qualitative_research=True))

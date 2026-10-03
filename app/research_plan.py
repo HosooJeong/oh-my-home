@@ -185,6 +185,20 @@ def build_research_plan(profile,candidates,enriched,targets,leisure_scope,educat
         # Round robin gives each question a target before spending the category's 3-facility budget.
         lists=[q['facility_ids'] for q in task['questions']];chosen=[]
         if task['research_kind']=='facility_fact':
+            if task['module']=='health':
+                # Keep day-to-day clinics in the shared budget rather than spending it only on hospitals.
+                clinics=[f for f in task['facilities'].values() if '의원' in (f.get('detail') or '')]
+                hospitals=[f for f in task['facilities'].values() if '병원' in (f.get('detail') or '')]
+                for candidate in candidates:
+                    available=[f for f in clinics if candidate.id in f.get('candidate_ids',[])]
+                    available.sort(key=lambda f:(f['candidate_distances'][candidate.id],f['id']))
+                    if available and available[0]['id'] not in chosen and len(chosen)<2:chosen.append(available[0]['id'])
+                clinics.sort(key=lambda f:(min(f['candidate_distances'].values()),f['id']))
+                for f in clinics:
+                    if len(chosen)>=2:break
+                    if f['id'] not in chosen:chosen.append(f['id'])
+                hospitals.sort(key=lambda f:(min(f['candidate_distances'].values()),f['id']))
+                if hospitals and len(chosen)<3:chosen.append(hospitals[0]['id'])
             # Give each compared home a nearby lead before filling the shared category budget.
             for candidate in candidates:
                 available=[f for f in task['facilities'].values() if candidate.id in f.get('candidate_ids',[])]

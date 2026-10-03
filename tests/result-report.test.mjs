@@ -1,8 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {categoryReports,radarGeometry,researchNotes,criterionReason,overviewReasons,categoryScope} from '../app/static/result-report.mjs';
+import {categoryReports,radarGeometry,researchNotes,criterionReason,overviewReasons,categoryScope,factSourceLabel,factDateLabel} from '../app/static/result-report.mjs';
 import {candidateViews,profileWeights} from '../app/static/analysis-view.mjs';
 const criterion=(id,group,importance=1)=>({id,group_id:group,module_id:group,label:id,need:id,importance,utility:{direction:'lower',ideal:500,limit:1500,unit:'m'},hard:null});
+test('directory labels cannot masquerade as official notices and registry linkage is not a publication date',()=>{
+ assert.match(factSourceLabel({source_role:'directory'}),/외부 정보 서비스.*운영자 확인 미확인/);
+ assert.doesNotMatch(factSourceLabel({source_role:'directory'}),/공식 안내/);
+ assert.equal(factSourceLabel({source_role:'government',registry_source:true}),'교육청 등록자료');
+ assert.equal(factDateLabel({source_reference_date:'2026-09-13',published_date:null}),'교육청 연계 2026-09-13');
+ assert.equal(factDateLabel({published_date:null,checked_at:'2026-10-03T10:00:00Z'}),'갱신일 미확인 · 직접 조회 2026-10-03');
+});
 const profile=()=>({groups:[{id:'living',label:'생활',weight:80},{id:'education',label:'교육',weight:20},{id:'housing',label:'비용',weight:0}],criteria:[criterion('mart','living'),criterion('clinic','living',3),criterion('school','education')],questions:[],context:[]});
 test('official facility facts retain per-home scope while web discoveries disclose unknown distance',()=>{
  const requests=[{id:'edu',module:'education'},{id:'med',module:'health'}],fact={research_kind:'facility_fact',source_role:'operator',field:'department',value:'내과'};

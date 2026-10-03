@@ -47,10 +47,10 @@ function renderReviews() {
       for (const excerpt of result.excerpts) {
         const detail = node('div', undefined, 'review-excerpt');
         const factual=excerpt.research_kind==='facility_fact';
-        detail.append(node('strong', `${topics[excerpt.topic]||'확인 내용'} · ${factual?'공식 안내':sentiments[excerpt.sentiment]}`),
-          node('blockquote', excerpt.quote), node('p', 'AI 요약: ' + excerpt.interpretation),
+        detail.append(node('strong', `${topics[excerpt.topic]||'확인 내용'} · ${factual?(excerpt.registry_source?'교육청 등록자료':excerpt.source_role==='directory'?'외부 서비스 표기 · 운영자 확인 미확인':'공식 안내'):sentiments[excerpt.sentiment]}`),
+          node('blockquote', excerpt.quote), node('p', (excerpt.registry_source?'등록 과정: ':'AI 요약: ') + excerpt.interpretation),
           reviewLink(excerpt.title, excerpt.source_url),
-          node('p', excerpt.published_date ? `작성 ${excerpt.published_date}` : factual?`갱신일 미확인 · 직접 조회 ${excerpt.checked_at?.slice(0,10)||'미확인'}`:'작성일 미확인', 'hint'));
+          node('p', excerpt.source_reference_date?`교육청 연계 ${excerpt.source_reference_date}`:excerpt.published_date ? `작성 ${excerpt.published_date}` : factual?`갱신일 미확인 · 직접 조회 ${excerpt.checked_at?.slice(0,10)||'미확인'}`:'작성일 미확인', 'hint'));
         if(facility.web_discovery)detail.append(node('p','웹에서 발견한 시설 · 집별 거리·생활권 적용 미확인','hint'));
         const identity = node('details'); identity.append(node('summary', '같은 지점으로 연결한 근거'), node('p', excerpt.identity_note));
         detail.append(identity); card.append(detail);

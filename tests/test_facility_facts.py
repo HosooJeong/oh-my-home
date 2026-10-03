@@ -3,7 +3,7 @@ import unittest
 from threading import Event
 from types import SimpleNamespace
 from unittest.mock import patch
-from app.facility_facts import FacilityFact,FacilityFacts,FactsResponse,research_facility_facts,public_url,DiscoveryResponse,DiscoveredFacility,discover_facility_facts
+from app.facility_facts import FacilityFact,FacilityFacts,FactsResponse,research_facility_facts,public_url,DiscoveryResponse,DiscoveredFacility,discover_facility_facts,registered_course_facts
 from app.facility_leads import medical_types
 from app.research_policy import SourcePage,today
 from app.research_plan import build_research_plan,evidence_status
@@ -34,6 +34,49 @@ class Runner:
 
 
 class FacilityFactTests(unittest.TestCase):
+    def test_directory_source_is_accepted_only_as_a_qualified_listing_not_an_official_fact(self):
+        f=fact(source_role='directory',interpretation='외부 서비스에 초등 수학으로 표기되어 있어요. 운영자 확인은 미확인이에요.')
+        value=self.research(Runner([f]));x=value['items'][0]['excerpts'][0]
+        self.assertEqual(x['evidence_level'],'service_listing');self.assertFalse(x['score_eligible'])
+        f.interpretation='초등 수학 수업을 실제 제공해요.'
+        rejected=self.research(Runner([f]))['items'][0]
+        self.assertEqual(rejected['excerpts'],[]);self.assertEqual(rejected['rejection_reasons'],{'directory_claim_unqualified':1})
+
+    def test_directory_reference_date_cannot_replace_verified_publication_or_bypass_freshness(self):
+        base=dict(source_role='directory',interpretation='외부 안내에 수학이 표기되어 있어요. 운영자 확인은 미확인이에요.')
+        for published in ('2018-01-01','2099-01-01',today().isoformat()):
+            with self.subTest(published=published):
+                result=self.research(Runner([fact(**base,published_date=published)]))['items'][0]
+                self.assertEqual(result['excerpts'],[])
+        for host in ('https://blog.naver.com/operator/123','https://operator.tistory.com/12'):
+            self.assertEqual(self.research(Runner([fact(**base,source_url=host)]))['items'][0]['excerpts'],[])
+
+    def test_education_course_field_survives_empty_web_results_without_inferred_grades_or_scores(self):
+        row=facility('academy:a',courses='초등수학1 / 보습')
+        qs=[dict(request_id='q1',question='초등 수학 수업',facility_ids=['academy:a'],parameters=[])]
+        value=research_facility_facts(Runner([]),[row],cancel=Event(),questions=qs)
+        self.assertEqual([(x['field'],x['value']) for x in value['items'][0]['excerpts']],[('subject','수학'),('school_level','초등')])
+        x=value['items'][0]['excerpts'][0];self.assertEqual(x['quote'],'초등수학1')
+        self.assertEqual(x['source_reference_date'],row['date']);self.assertIsNone(x['published_date'])
+        self.assertTrue(x['registry_source']);self.assertFalse(x['score_eligible'])
+        self.assertEqual(value['facilities'][row['id']]['name'],row['name'])
+        row['courses']='보습 / 보습';row['name']='초등수학 가상학원'
+        self.assertEqual(registered_course_facts([row],qs),{})
+        row['courses']='초등수학1';row['date']='2018-01-01'
+        self.assertEqual(registered_course_facts([row],qs),{})
+
+    def test_clinic_leads_are_not_crowded_out_by_closer_hospitals(self):
+        p=profile();p.groups[0].id='health';p.criteria[0].group_id='health';p.criteria[0].module_id='health'
+        p.criteria[0].metric='department_fit_unverified';p.criteria[0].need='내과와 소아청소년과 의원 이용';p.criteria[0].utility=None
+        cs=candidates();rows=[]
+        for n,(detail,offset) in enumerate([('일반병원',0),('종합병원',.0001),('내과/소아과 의원',.0002),('내과/소아과 의원',.0003)]):
+            rows.append(dict(id='medical:'+str(n),kind='shops',name='가상의료기관'+str(n),address='진주시 가상로 1',
+                detail=detail,date=today().isoformat(),lat=cs[0].latitude+offset,lon=cs[0].longitude))
+        shop_index=SimpleNamespace(records={r['id']:r for r in rows})
+        plan=build_research_plan(p,cs,{'modules':[],'facilities':{}},[],None,None,shop_index)
+        chosen=plan['tasks'][0]['facilities']
+        self.assertEqual(sum('의원' in r['detail'] for r in chosen),2);self.assertEqual(len(chosen),3)
+
     def research(self,runner=None,page=None):
         return research_facility_facts(runner or Runner(),[facility('academy:a')],cancel=Event(),
             questions=[dict(request_id='q1',question='초등 수학 수업',facility_ids=['academy:a'],parameters=[])],

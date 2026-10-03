@@ -4,6 +4,8 @@ const finite=n=>typeof n==='number'&&Number.isFinite(n);
 const valid=r=>r.known&&finite(r.fit)&&r.fit>=0&&r.fit<=1;
 const node=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;};
 export const percentage=n=>finite(n)?n.toFixed(1).replace(/\.0$/,'')+'%':'미확인';
+export const factSourceLabel=x=>x.registry_source?'교육청 등록자료':({government:'공공기관의 시설 안내',operator:'운영자의 공식 안내',directory:'외부 정보 서비스의 표기 · 운영자 확인 미확인'}[x.source_role]||'출처 구분 미확인');
+export const factDateLabel=x=>x.source_reference_date?`교육청 연계 ${x.source_reference_date}`:x.published_date?`작성 ${x.published_date}`:`갱신일 미확인 · 직접 조회 ${x.checked_at?.slice(0,10)||'미확인'}`;
 const distancePreferences={
  pharmacy_straight_line_distance_m:['약국','약국이 가까운 생활을 원하는 선호'],
  clinic_straight_line_distance_m:['내과·소아과 의원','의원이 가까운 생활을 원하는 선호'],
@@ -96,7 +98,7 @@ export function researchNotes(data,requests,category='overview'){
  if(!data)return [];
  const ids=new Set(requests.filter(r=>category==='overview'||r.module===category).map(r=>r.id)),notes=[];
  const include=x=>category==='overview'||(x.request_ids||[]).some(id=>ids.has(id));
- for(const item of data.items||[])for(const x of item.excerpts||[])if(include(x))notes.push({kind:'facility',facilityId:item.facility_id,excerpt:x,candidateIds:item.candidate_ids||[],candidateDistances:item.candidate_distances||{},scope:item.web_discovery?'진주시에서 발견한 시설 · 집별 거리·생활권 적용 미확인':null,role:x.research_kind==='facility_fact'?(x.source_role==='government'?'공공기관의 시설 안내':'운영자의 공식 안내'):null});
+ for(const item of data.items||[])for(const x of item.excerpts||[])if(include(x))notes.push({kind:'facility',facilityId:item.facility_id,excerpt:x,candidateIds:item.candidate_ids||[],candidateDistances:item.candidate_distances||{},scope:item.web_discovery?'진주시에서 발견한 시설 · 집별 거리·생활권 적용 미확인':null,role:x.research_kind==='facility_fact'?factSourceLabel(x):null});
  for(const item of data.safety?.items||[])for(const x of item.excerpts||[])if((category==='overview'||category==='safety')&&include(x))notes.push({kind:'area',title:item.area_name,excerpt:x,scope:'지역 공식 자료 · 집별 안전 판정 미확인'});
  for(const item of data.leisure?.discoveries||[]){
   const matching=category==='overview'||category==='leisure'&&requests.some(r=>r.module==='leisure'&&r.criterion_ids?.includes(item.criterion_id));

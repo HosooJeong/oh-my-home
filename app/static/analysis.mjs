@@ -5,7 +5,7 @@ import {entryReady} from './entry-places.mjs';
 import {getSession,debugEvent} from './debug-session.mjs';
 import {createVillageWorld} from './village-world.mjs';
 import {STATUS_LABELS,selectedStates,eventStates,resultStates} from './village-journey.mjs';
-import {categoryReports,renderRadar,renderReport,researchNotes} from './result-report.mjs';
+import {categoryReports,renderRadar,renderReport,researchNotes,factDateLabel} from './result-report.mjs';
 const $=id=>document.getElementById(id),el=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;};
 let draft;try{draft=readDraft(sessionStorage.getItem(STORAGE_KEY));}catch{draft=readDraft(null);}
 const state={token:null,phase:'loading',profile:null,places:draft.entry==='discover'?[]:structuredClone(draft.candidates),run:null,job:null,map:null,overlays:[],busy:false,generation:null,scopeSelection:false,scopeArea:null,cancelled:false,metadata:null,intakeMetadata:null,additionalGroups:[],additionalConfirmed:{},researchPlan:null,reportCategory:'overview',reportCandidate:null,researchData:null,researchRequests:[]};
@@ -179,7 +179,7 @@ function paintResearchContent(){
   if(note.candidateIds?.length&&!note.candidateIds.includes(state.reportCandidate))continue;
   const facility=state.run?.facilities?.[note.facilityId],x=note.excerpt,box=el('article',undefined,'research-card');box.append(el('h3',note.title||facility?.name||'주변 시설'));
   const factual=x?.research_kind==='facility_fact',distance=note.candidateDistances?.[state.reportCandidate],bound=note.facilityId&&view?.rows.some(r=>r.facilities.some(f=>f.id===note.facilityId));const scope=note.scope||(factual?(Number.isFinite(distance)?`이 집에서 직선 ${Math.round(distance).toLocaleString('ko-KR')}m · 조사 후보`:'등록자료의 조사 후보'):(bound?'이 집의 조건에 연결된 시설 · 일부 이용자의 경험': '조사 범위의 시설 · 이 집에 대한 적용은 미확인이에요.'));box.append(el('p',scope,'quiet'));if(note.role)box.append(el('p',note.role,'quiet'));
-  if(x){if(factual)box.append(el('strong',({subject:'과목',school_level:'대상 학년',class_form:'수업 형태',department:'진료과',service:'이용 조건'}[x.field]||'확인 내용')+' · '+x.value));box.append(el('p',x.interpretation||(factual?'공식 안내에서 확인했어요.':'인용 범위 내 참고')),link(x.title||'원문',x.source_url||facility?.source_url||''));const more=el('details');more.append(el('summary','원문과 확인 시점'),el('blockquote',x.quote),el('p',x.published_date?`작성 ${x.published_date}`:`갱신일 미확인 · 직접 조회 ${x.checked_at?.slice(0,10)||'미확인'}`,'quiet'));box.append(more);count++;}else box.append(el('p',note.note,'quiet'),link('운영자 원문',note.url||''));$('research-results').append(box);
+  if(x){if(factual)box.append(el('strong',({subject:'과목',school_level:'대상 학년',class_form:'수업 형태',department:'진료과',service:'이용 조건'}[x.field]||'확인 내용')+' · '+x.value));box.append(el('p',x.interpretation||'인용 범위 내 참고'),link(x.title||'원문',x.source_url||facility?.source_url||''));const more=el('details');more.append(el('summary','원문과 확인 시점'),el('blockquote',x.quote),el('p',factDateLabel(x),'quiet'));if(facility?.review_links)more.append(link('카카오맵',facility.review_links.kakao),link('네이버지도',facility.review_links.naver));box.append(more);count++;}else box.append(el('p',note.note,'quiet'),link('운영자 원문',note.url||''));$('research-results').append(box);
  }
  if(state.researchData)$('research-status').textContent=count?`확인한 이용 조건 ${count}건 · 거리 점수와 별도`:'이 집의 조사 범위에서 확인한 근거가 없어요. 조건 충족은 미확인이에요.';
 }

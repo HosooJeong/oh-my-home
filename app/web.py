@@ -349,7 +349,8 @@ class AppState:
                         if module in ('living','education','health','dining','facility_reviews'):
                             researcher=research_facility_facts if task.get('research_kind')=='facility_fact' else research_reviews
                             value=researcher(runner,task['facilities'],cancel=cancel,questions=task.get('questions')) if task['facilities'] else {'items':[]}
-                            if task.get('research_kind')=='facility_fact' and not any(i.get('excerpts') for i in value.get('items',[])):
+                            if task.get('research_kind')=='facility_fact' and not any(
+                                    not x.get('registry_source') for i in value.get('items',[]) for x in i.get('excerpts',[])):
                                 if task['facilities']:
                                     result['steps'].append({'module':module,'stage':'registered_facility_facts',**runner.last_metadata})
                                 stage='facility_discovery'
@@ -363,6 +364,7 @@ class AppState:
                                     result['errors'].append({'module':module,'stage':'facility_discovery',
                                         'code':discovery_error.code if isinstance(discovery_error,RunnerError) else 'research_failed'})
                             result['items'].extend(value.get('items',[]))
+                            if task.get('research_kind')=='facility_fact':result['facilities'].update(value.get('facilities',{}))
                         elif module=='safety':
                             value=research_safety(runner,task['targets'],cancel=cancel);result['safety']=value
                         else:
