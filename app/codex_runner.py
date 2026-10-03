@@ -72,6 +72,7 @@ def classify_error(text: str) -> str:
 
 class CodexRunner:
     _slot = threading.Lock()
+    requires_explicit_need_fields = True
 
     def __init__(self, executable: str | None = None, timeout: float = 120,
                  model: str | None = DEFAULT_MODEL, reasoning_effort: str = DEFAULT_REASONING_EFFORT):
@@ -178,6 +179,7 @@ class CodexRunner:
     def _run(self, prompt, response_type, cancel, search, domains):
         started = time.monotonic()
         self.last_metadata = {"search_mode": "live" if search else "disabled",
+                              "provider": "codex",
                               "requested_model": self.model,
                               "requested_reasoning_effort": self.reasoning_effort,
                               "cli_executable": self.executable,

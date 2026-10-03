@@ -13,6 +13,7 @@ from urllib.parse import urlsplit
 from pydantic import Field
 
 from .codex_runner import CodexRunner, RunnerError
+from .llm_settings import ModelSettings, server_settings
 from .contracts import Candidate, Contract, InterviewTurn, NeedProfile, Weight, digest
 from .candidates import CandidatePool, GenerationInput
 from .intake import prepare_profile
@@ -129,7 +130,7 @@ class HousingProfileInput(Contract):
 
 
 class AppState:
-    def __init__(self, index, runner_factory=CodexRunner, stop_index=None, candidate_pool=None, housing_index=None, education_index=None, safety_index=None, leisure_index=None, debug_transcripts=None, route_client=None):
+    def __init__(self, index, runner_factory=CodexRunner, stop_index=None, candidate_pool=None, housing_index=None, education_index=None, safety_index=None, leisure_index=None, debug_transcripts=None, route_client=None, llm_settings=None):
         self.index, self.runner_factory = index, runner_factory
         self.candidate_pool = candidate_pool
         self.stop_index = stop_index if stop_index is not None else StopIndex({"generated_at": "unavailable", "records": []})
@@ -145,6 +146,7 @@ class AppState:
         self.active_job = None
         self.debug_transcripts = debug_transcripts
         self.route_client = route_client
+        self.llm_settings = llm_settings or ModelSettings()
 
     def record(self, session, role, content, **details):
         if self.debug_transcripts and session.get('debug_path'):
@@ -166,12 +168,21 @@ class AppState:
                 token = secrets.token_urlsafe(32)
                 self.sessions[token] = {"touched": now, "jobs": {}, "comparison": None,
                                         "review_job": None, "review_key": None, "lock": Lock(),
+                                        'llm_settings': self.llm_settings,
                                         'debug_path': self.debug_transcripts.start() if self.debug_transcripts else None}
             if token not in self.sessions:
                 raise PermissionError("session_expired")
             result = self.sessions[token]
             result["touched"] = now
             return token, result
+
+    def model_settings(self, session, data=None):
+        with self.lock:
+            if data is not None:
+                if any(j['status'] == 'running' for j in session['jobs'].values()):
+                    raise RunnerError('busy')
+                session['llm_settings'] = session['llm_settings'].updated(data)
+            return session['llm_settings'].public()
 
     def intake(self, session, data):
         return self.start_job(session, data, "intake",
@@ -222,11 +233,12 @@ class AppState:
             if kind in ('reviews', 'supplement'):
                 session["review_job"] = job
             self.active_job = job
+            settings = session['llm_settings']
         def work():
             runner = None
             try:
                 self.record(session, '사용자 요청', data.model_dump(), job=job['id'], kind=kind)
-                runner = self.runner_factory()
+                runner = settings.runner(self.runner_factory)
                 runner.on_debug_event = lambda role, content, **details: self.record(session, role, content, job=job['id'], **details)
                 result = execute(runner, job["cancel"])
                 with session["lock"], self.lock:
@@ -471,6 +483,9 @@ def make_handler(state, env_path):
                          '/result-report.css': (STATIC / 'result-report.css', 'text/css; charset=utf-8'),
                          '/entry-places.mjs': (STATIC / 'entry-places.mjs', 'text/javascript; charset=utf-8'),
                          '/debug-session.mjs': (STATIC / 'debug-session.mjs', 'text/javascript; charset=utf-8'),
+                         '/settings': (STATIC / 'settings.html', 'text/html; charset=utf-8'),
+                         '/settings.mjs': (STATIC / 'settings.mjs', 'text/javascript; charset=utf-8'),
+                         '/settings.css': (STATIC / 'settings.css', 'text/css; charset=utf-8'),
                          '/typography.css': (STATIC / 'typography.css', 'text/css; charset=utf-8'),
                          '/interview.css': (STATIC / 'interview.css', 'text/css; charset=utf-8'),
                          '/kakao-map.mjs': (STATIC / 'kakao-map.mjs', 'text/javascript; charset=utf-8'),
@@ -511,7 +526,7 @@ def make_handler(state, env_path):
                     return self.send(200, (state.route_client or KakaoRoutes(env_path)).status())
                 if path == "/api/bootstrap":
                     token, session = state.session(self.headers.get('X-Session') or None)
-                    return self.send(200, {"token": token, 'debug_enabled': bool(state.debug_transcripts),
+                    return self.send(200, {"token": token, 'llm': state.model_settings(session), 'debug_enabled': bool(state.debug_transcripts),
                         'debug_session': session['debug_path'].stem if session.get('debug_path') else None, "data": {**state.index.metadata(),
                         "transport": state.stop_index.metadata(), "housing": state.housing.index.metadata(),
                         'education': state.education_index.metadata(),
@@ -519,6 +534,9 @@ def make_handler(state, env_path):
                         'leisure':state.leisure_index.metadata(),
                         "candidate_generation": state.candidate_pool.metadata()
                         if state.candidate_pool else {"available": False}}})
+                if path == '/api/llm/settings':
+                    _, session = state.session(self.headers.get('X-Session', ''))
+                    return self.send(200, state.model_settings(session))
                 if path.startswith("/api/jobs/"):
                     _, session = state.session(self.headers.get("X-Session", ""))
                     with state.lock:
@@ -552,6 +570,18 @@ def make_handler(state, env_path):
                 _, session = state.session(self.headers.get("X-Session", ""))
                 data = json.loads(raw)
                 path = urlsplit(self.path).path
+                if path == '/api/llm/settings':
+                    # Credentials are intentionally excluded from transcript recording.
+                    return self.send(200, state.model_settings(session, data))
+                if path == '/api/llm/models':
+                    if data != {}:
+                        raise RunnerError('invalid_model_settings')
+                    with state.lock:
+                        settings = session['llm_settings']
+                    if settings.provider != 'openai':
+                        raise RunnerError('unsupported_configuration')
+                    from .openai_runner import OpenAIRunner
+                    return self.send(200, {'models': OpenAIRunner(settings.api_key, settings.model, settings.effort, timeout=15).models()})
                 if path == '/api/routes':
                     # Route coordinates and provider responses must stay out of debug/model records.
                     request = RouteInput.model_validate(data)
@@ -612,6 +642,8 @@ def make_handler(state, env_path):
                 self.send(403, {"error": "session_or_origin"})
             except RouteError as error:
                 self.send(error.http_status, error.public())
+            except RunnerError as error:
+                self.send(409 if error.code == 'busy' else 400, {'error': error.code})
             except PreservationError as error:
                 self.send(422, {'error': str(error)})
             except (ValueError, TypeError):
@@ -673,7 +705,8 @@ def main():
         print('Leisure public data unavailable: prepare verified park/library snapshots.',flush=True)
     state = AppState(ShopIndex(document), stop_index=StopIndex(document), candidate_pool=pool,
                      housing_index=housing, education_index=education, safety_index=safety,leisure_index=leisure,
-                     debug_transcripts=DebugTranscripts(args.debug_transcripts) if args.debug_transcripts else None)
+                     debug_transcripts=DebugTranscripts(args.debug_transcripts) if args.debug_transcripts else None,
+                     llm_settings=server_settings(args.env_file))
     server = ThreadingHTTPServer((args.host, args.port), make_handler(state, args.env_file))
     server.daemon_threads = True
     print(f"Saljari M1/M2/M3/M4/M5/M6: http://localhost:{args.port} (bind {args.host})", flush=True)

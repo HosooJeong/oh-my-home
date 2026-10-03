@@ -287,7 +287,7 @@ field=context의 조사 요청은 같은 유형의 여러 원문을 같은 요�
     need_records=profile.needs if isinstance(profile,IntakeDraft) else None
     if isinstance(profile, IntakeDraft):
         # Logged v2 drafts and offline fixtures remain readable; fresh native output must use the new role contract.
-        if isinstance(runner,CodexRunner) and any('field' not in n.model_fields_set for n in profile.needs):
+        if getattr(runner, 'requires_explicit_need_fields', False) and any('field' not in n.model_fields_set for n in profile.needs):
             raise RunnerError('invalid_intake_contract')
         runner.last_metadata['intake_format'] = 'compact_sources_v3_fields'
         try:
