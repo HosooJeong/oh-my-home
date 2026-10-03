@@ -3,9 +3,11 @@ import re
 from .contracts import digest
 
 FLAGS={'living':'qualitative_research_requested','education':'education_research','safety':'safety_research',
-       'leisure':'leisure_research','transport':'transport_research','housing':'housing_research','extension':'extension_research'}
+       'leisure':'leisure_research','transport':'transport_research','housing':'housing_research','extension':'extension_research','health':'health_research','dining':'dining_research'}
 DISTANCES={'grocery_straight_line_distance_m':'grocery','house_to_grocery_straight_line_distance_m':'grocery',
-           'convenience_straight_line_distance_m':'convenience'}
+           'convenience_straight_line_distance_m':'convenience',
+           'pharmacy_straight_line_distance_m':'pharmacy','clinic_straight_line_distance_m':'clinic',
+           'everyday_meal_straight_line_distance_m':'everyday_meal','restaurant_straight_line_distance_m':'restaurant'}
 PRIVATE=re.compile(r'[\w.+-]+@[\w.-]+\.[a-zA-Z]+|0\d{1,2}[- ]?\d{3,4}[- ]?\d{4}|(?:로|길)\s*\d+(?:번길)?(?!\d|\s*(?:m|분|회|명|개|곳|원))|(?:위도|경도)\s*[:=]?\s*[-+]?\d')
 
 
@@ -66,24 +68,27 @@ def build_research_plan(profile,candidates,enriched,targets,leisure_scope,educat
                 record['criterion_ids']=[c.id for c in considered]
             if target is None:
                 kinds={DISTANCES[c.metric] for c in considered if c.metric in DISTANCES}
-                target=next(iter(kinds)) if len(kinds)==1 else 'shops' if module=='living' else 'academy'
-            allowed={'grocery','convenience','shops'} if module=='living' else {'academy','school'}
+                target=next(iter(kinds)) if len(kinds)==1 else 'shops' if module in ('living','health','dining') else 'academy'
+            allowed={'living':{'grocery','convenience','shops'}, 'health':{'pharmacy','clinic','shops'},
+                     'dining':{'everyday_meal','restaurant','shops'}, 'education':{'academy','school'}}[module]
             if target not in allowed:
                 record.update(status='not_executed',reason='facility_type_unsupported');continue
             ids=set()
             relevant={c.id for c in considered if (module=='education' and
                 c.metric==('academy_count_within_radius' if target=='academy' else 'school_straight_line_distance_m')) or
-                (module=='living' and c.metric in DISTANCES and (target=='shops' or DISTANCES[c.metric]==target))}
+                (module in ('living','health','dining') and c.metric in DISTANCES and (target=='shops' or DISTANCES[c.metric]==target))}
             for result in enriched['modules']:
                 for e in result['evidence']:
-                    if e['criterion_id'] in relevant and e['source_record']:ids.add(e['source_record'])
+                    if (e['criterion_id'] in relevant and e['source_record'] and
+                            (module not in ('health','dining') or e.get('status')=='verified')):
+                        ids.add(e['source_record'])
             if module=='education':
                 for detail in enriched.get('education_details',[]):
                     if detail['criterion_id'] in relevant:ids.update(r['id'] for r in detail['selected'])
             # A named facility request must match a verified target rather than silently using a nearest substitute.
             name=next((f.value for f in reversed(profile.context) if f.key==module+'_research_facility' and f.source_quote==quote),None)
             rows=[f for id,f in enriched['facilities'].items() if id in ids and
-                  f['kind']==('shops' if module=='living' else target) and (name is None or f['name']==name)]
+                  f['kind']==('shops' if module in ('living','health','dining') else target) and (name is None or f['name']==name)]
             if module=='education':
                 from .modules.education import SUBJECTS
                 scope={field:next((f.value for f in reversed(profile.context) if f.key=='education_research_'+field and f.source_quote==quote),None)

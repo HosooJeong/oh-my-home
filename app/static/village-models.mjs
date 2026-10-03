@@ -193,13 +193,12 @@ export function createToyModels(T){
    tile(g,dark,0,2.08,.168,.022,.12,.018);tile(g,dark,.041,2.04,.168,.095,.022,.018);
    brick(g,c.color,0,2.22,-.2,2,2,.1,.31);tile(g,dark,-.57,1.9,-.42,.026,.57,.026);tile(g,'#dfb965',-.43,2.06,-.42,.26,.16,.028);
    for(const x of [-.53,.53])flower(g,x,.73,'#d69a76');
-  }else if(c.id==='safety'){
+  }else if(c.id==='health'){
    wall(g,'#e9dfcf',1.12,1.04,4);brick(g,c.color,0,1.28,0,4,4,.13);brick(g,white,0,1.43,0,3,3,.14);
    window(g,-.32,.78,.56,.29,.42);door(g,.25,.57,.66);window(g,.62,.8,0,.36,.38,Math.PI/2);
-   tile(g,c.color,0,1.47,.6,.85,.25,.08);tile(g,white,0,1.49,.651,.35,.04,.02);tile(g,white,0,1.49,.651,.04,.14,.02);
+   tile(g,c.color,0,1.47,.6,.85,.25,.08);tile(g,white,0,1.49,.651,.26,.065,.02);tile(g,white,0,1.49,.651,.065,.18,.02);
    cylinder(g,'#d8caab',-.25,1.54,0,.15,.1);cylinder(g,c.color,-.25,1.67,0,.12,.15,[0,0,0],'glass',.09);
-   tile(g,dark,.65,.91,.55,.058,1.37,.058);tile(g,dark,.56,1.57,.55,.24,.06,.06);
-   tile(g,white,.48,1.51,.55,.23,.17,.23);tile(g,gold,.48,1.41,.55,.15,.025,.15);brick(g,c.color,.61,.25,.48,1,1,.14,.25);
+   flower(g,.63,.66,'#e49375');
    tile(g,dark,-.56,.36,.73,.2,.18,.055);tile(g,gold,-.56,.36,.767,.13,.027,.02);
   }else if(c.id==='leisure'){
    brick(g,c.color,0,.25,0,5,5,.09);const t=tree(-.47,-.4,.61);g.add(t);
@@ -211,13 +210,16 @@ export function createToyModels(T){
    tile(g,white,.38,.68,.31,.025,.14,.68);for(let i=0;i<9;i++)tile(g,dark,.397,.69,.01+i*.075,.008,.13,.012);
    cylinder(g,'#bb7660',.61,.63,.5,.055,.017);tile(g,dark,.61,.628,.57,.028,.02,.07);
    bench(g,-.43,.49);flower(g,.65,-.64,'#dbbd69');
-  }else if(c.id==='housing'){
-   // A small key on a stepped stack of assembled bricks and coin plates.
-   for(let row=0;row<4;row++)brick(g,row%2?cream:c.color,-.3,.35+row*.23,-.1,2,2,.22);
-   for(const [x,z,n] of [[.42,.18,4],[.51,-.31,2]])for(let i=0;i<n;i++){cylinder(g,gold,x,.28+i*.09,z,.19,.08,[0,0,0],'metal');ring(g,'#efcf78',x,.326+i*.09,z,.153,.012,[Math.PI/2,0,0],'metal');}
-   ring(g,gold,-.28,1.29,-.08,.17,.047,[Math.PI/2,0,0],'metal');tile(g,gold,-.28,1.29,.21,.085,.06,.39,[0,0,0],'metal');
-   for(const z of [.29,.4])tile(g,gold,-.2,1.29,z,.17,.06,.07,[0,0,0],'metal');
-   tile(g,'#91a79a',.35,.25,.55,.47,.03,.28);tile(g,cream,.35,.27,.55,.33,.012,.16);
+  }else if(c.id==='dining'){
+   wall(g,cream,1.14,.84,3);door(g,-.35,.58,.59);window(g,.28,.84,.57,.42,.38);
+   brick(g,c.color,0,1.12,0,5,4,.15);brick(g,cream,0,1.26,0,4,3,.1);
+   // Restaurant awning, serving counter, two stools and a plate on the roof sign.
+   for(let i=0;i<6;i++)tile(g,i%2?cream:c.color,-.55+i*.22,1.08,.74,.22,.08,.47,[-.22,0,0]);
+   tile(g,c.color,.24,.57,.81,.71,.12,.28);for(const x of [.02,.45]){cylinder(g,dark,x,.34,1.03,.032,.24);cylinder(g,c.color,x,.48,1.03,.13,.065);}
+   tile(g,c.color,0,1.48,0,.65,.38,.12);cylinder(g,white,0,1.48,.08,.12,.03,[Math.PI/2,0,0]);
+   for(const x of [-.18,.18])tile(g,white,x,1.48,.095,.02,.23,.025);
+   flower(g,-.63,.7,'#d69a76');
+
   }
   return finish(g);
  }

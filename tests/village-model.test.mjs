@@ -8,9 +8,9 @@ test('five distance levels are invariant under horizontal rotation',()=>{
 });
 test('displayed shares sum to 100% and a single block always has 100%',()=>{
  const d=emptyDraft();for(const c of CATEGORIES)toggleCategory(d,c.id);
- setLevel(d,'living',1);setLevel(d,'transport',2);setLevel(d,'housing',5);
+ setLevel(d,'living',1);setLevel(d,'transport',2);setLevel(d,'dining',5);
  assert.equal(Math.round(Object.values(shares(d.blocks)).reduce((a,b)=>a+b,0)*10),1000);
- assert.equal(evaluationShares(d.blocks).housing,0);
+ assert.ok(evaluationShares(d.blocks).health>0);assert.ok(evaluationShares(d.blocks).dining>0);
  assert.equal(Math.round(Object.values(evaluationShares(d.blocks)).reduce((a,b)=>a+b,0)*10),1000);
  for(const c of CATEGORIES.slice(1))toggleCategory(d,c.id);
  assert.equal(d.blocks.length,1);assert.equal(shares(d.blocks).living,100);assert.equal(toggleCategory(d,'living'),false);
@@ -33,12 +33,12 @@ test('saved drafts preserve answers through deselection and reject corrupt/dupli
 });
 test('handoff stays below the intake limit and includes only selected answers',()=>{
  const d=emptyDraft();d.entry='discover';d.location='가'.repeat(200);for(const c of CATEGORIES){toggleCategory(d,c.id);d.answers[c.id]='나'.repeat(450);}
- assert.ok(buildRequest(d).length<4000);toggleCategory(d,'education');assert.ok(!buildRequest(d).includes('교육·육아:'));assert.ok(buildRequest(d).includes('가격 점수/실제 매물 추천은 제외'));
+ assert.ok(buildRequest(d).length<4000);toggleCategory(d,'education');assert.ok(!buildRequest(d).includes('교육·육아:'));assert.ok(buildRequest(d).includes('건강·의료:'));assert.ok(buildRequest(d).includes('식사·외식:'));
 });
-test('handoff preserves additional needs and chosen weights, with price reference-only',()=>{
- const d=emptyDraft();for(const id of ['living','transport','housing'])toggleCategory(d,id);setLevel(d,'living',1);setLevel(d,'transport',5);
+test('handoff preserves additional needs and all six scored category weights',()=>{
+ const d=emptyDraft();for(const id of ['living','transport','dining'])toggleCategory(d,id);setLevel(d,'living',1);setLevel(d,'transport',5);
  const p={groups:CATEGORIES.map(c=>({id:c.id,weight:50,source:'proposed'})),criteria:CATEGORIES.map(c=>({id:c.id+'-criterion',group_id:c.id,importance:100})),questions:[{id:'e',criterion_ids:['education-criterion']},{id:'t',criterion_ids:['transport-criterion']}]};
- const result=applyVillagePreferences(p,d);assert.equal(result.profile.groups.find(g=>g.id==='living').weight,100);assert.equal(result.profile.groups.find(g=>g.id==='transport').weight,20);assert.equal(result.profile.groups.find(g=>g.id==='housing').weight,0);assert.equal(result.profile.groups.length,6);assert.deepEqual(result.profile.questions,p.questions);assert.deepEqual(result.additionalGroups,['education','safety','leisure']);assert.equal(p.groups[0].weight,50);
+ const result=applyVillagePreferences(p,d);assert.equal(result.profile.groups.find(g=>g.id==='living').weight,100);assert.equal(result.profile.groups.find(g=>g.id==='transport').weight,20);assert.equal(result.profile.groups.find(g=>g.id==='dining').weight,60);assert.equal(result.profile.groups.length,6);assert.deepEqual(result.profile.questions,p.questions);assert.deepEqual(result.additionalGroups,['education','health','leisure']);assert.equal(p.groups[0].weight,50);
 });
 
 test('an extension hard need and its question survive until explicit exclusion',()=>{
@@ -52,10 +52,18 @@ test('an extension hard need and its question survive until explicit exclusion',
 test('missing selected categories and reference-only profiles are explicit',()=>{
  const d=emptyDraft();toggleCategory(d,'living');assert.deepEqual(applyVillagePreferences({groups:[],criteria:[],questions:[]},d).missing,['living']);
  assert.deepEqual(applyVillagePreferences({groups:[{id:'living',weight:0}],criteria:[{group_id:'living',importance:0}],questions:[]},d).missing,['living']);
- const price=emptyDraft();toggleCategory(price,'housing');assert.equal(applyVillagePreferences({groups:[{id:'housing',weight:100}],criteria:[],questions:[]},price).referenceOnly,true);
+ const price=emptyDraft();price.extra='전세 실거래가를 참고하고 싶어요.';assert.equal(applyVillagePreferences({groups:[{id:'housing',weight:0}],criteria:[],questions:[]},price).referenceOnly,true);
 });
 test('three entries remain distinct and private house notes stay out of model input',()=>{
  for(const entry of ['discover','single','multiple']){const d=emptyDraft();d.entry=entry;d.location='개인 집 메모';toggleCategory(d,'living');assert.equal(readDraft(JSON.stringify(d)).entry,entry);assert.equal(buildRequest(d).includes('개인 집 메모'),entry==='discover');}
  const old=emptyDraft();old.entry='known';assert.equal(readDraft(JSON.stringify(old)).entry,'multiple');
- const price=emptyDraft();toggleCategory(price,'housing');const result=applyVillagePreferences({groups:[{id:'housing',weight:0}],criteria:[],questions:[]},price);assert.ok(result.profile);assert.equal(result.referenceOnly,true);
+ const price=emptyDraft();price.extra='전세 실거래 참고';const result=applyVillagePreferences({groups:[{id:'housing',weight:0}],criteria:[],questions:[]},price);assert.ok(result.profile);assert.equal(result.referenceOnly,true);
+});
+
+test('old safety and cost drafts preserve original text as additional needs, require review and never become new category answers',()=>{
+ const old={version:1,entry:'multiple',blocks:[{id:'living',x:3,z:3},{id:'safety',x:4,z:-3},{id:'housing',x:-4,z:3}],answers:{living:'편의점',safety:'밤에 걷는 길이 안전하면 좋겠어요.',housing:'전세 실거래가 참고'},handoff:true};
+ const d=readDraft(JSON.stringify(old));assert.deepEqual(d.blocks.map(b=>b.id),['living']);assert.equal(d.handoff,false);
+ assert.equal(d.answers.health,'');assert.equal(d.answers.dining,'');assert.deepEqual(d.legacy.map(r=>r.answer),[old.answers.safety,old.answers.housing]);
+ assert.ok(buildRequest(d).includes(old.answers.safety));assert.ok(buildRequest(d).includes(old.answers.housing));
+ assert.deepEqual(readDraft(JSON.stringify(d)).legacy,d.legacy);
 });

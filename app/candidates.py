@@ -14,13 +14,15 @@ from .modules.living import METRICS
 from .modules.transport import METRIC
 from .modules.education import SCHOOL_METRIC, ACADEMY_METRIC
 from .modules.leisure import PARK_METRIC, LIBRARY_METRIC, MEETING_METRIC
+from .modules.registered_access import HEALTH_TYPES, DINING_TYPES
 
 
 def execution_plan(profile):
     normalized = weights(profile)
     queryable = {'living':set(METRICS), 'transport':{METRIC},
                  'education':{SCHOOL_METRIC, ACADEMY_METRIC},
-                 'leisure':{PARK_METRIC, LIBRARY_METRIC, MEETING_METRIC}}
+                 'leisure':{PARK_METRIC, LIBRARY_METRIC, MEETING_METRIC},
+                 'health':set(HEALTH_TYPES), 'dining':set(DINING_TYPES)}
     return [dict(criterion_id=c.id, label=c.label, module_id=c.module_id, weight=normalized[c.id],
                  role='query' if c.metric in queryable.get(c.module_id, set()) and c.utility else 'unverified',
                  hard=c.hard is not None)

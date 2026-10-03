@@ -23,7 +23,9 @@ const ICONS={
  'zoom-in':['M17 17l4 4','M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0','M6 10h8','M10 6v8'],
  'zoom-out':['M17 17l4 4','M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0','M6 10h8'],
  remove:['m6 6 12 12','M18 6 6 18'],
- living:['M12 21 3.8 13a5.2 5.2 0 0 1 7.4-7.3L12 6.5l.8-.8a5.2 5.2 0 0 1 7.4 7.3Z','M8 11h8','M12 7v8'],
+ living:['M3 6h3l2 12h11l2-9H7','M9 21h.1','M18 21h.1'],
+ health:['M9 3h6v6h6v6h-6v6H9v-6H3V9h6Z'],
+ dining:['M4 3v7a3 3 0 0 0 6 0V3','M7 3v19','M19 3c-3 3-3 7-3 10h3','M19 3v19'],
  transport:['M5 17V6a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v11Z','M5 10h14','M8 3v7','M8 14h.1','M16 14h.1','M7 17v4','M17 17v4'],
  education:['M12 5v16','M12 5C9 3 5 3 2 5v14c3-2 7-2 10 2 3-4 7-4 10-2V5c-3-2-7-2-10 0'],
  safety:['M12 2 3 6v6c0 5 5 8 9 10 4-2 9-5 9-10V6Z','m8 12 3 3 5-6'],
@@ -90,7 +92,9 @@ function render(){
   $('question-prev').hidden=step===0;$('question-next-label').textContent=step===order.length-1?'입력 확인':'다음';
  }else if(mode==='review'){
   $('question-progress').textContent=`${order.length}/${order.length}`;$('answer-summary').replaceChildren();
+  $('extra-request').value=draft.extra||'';$('review-note').textContent=draft.legacy?.length?'기존 안전·비용 조건은 추가 조건으로 보존했어요.':'';
   for(const id of order){const c=CATEGORIES.find(c=>c.id===id),row=document.createElement('div');row.className='answer-item';const name=document.createElement('strong'),percent=document.createElement('span'),answer=document.createElement('p');name.textContent=c.label;percent.textContent=id==='housing'?'참고':percentages[id]+'%';name.append(percent);answer.textContent=draft.answers[id]?.trim()||'나중에 정할게요';row.append(name,answer);$('answer-summary').append(row);}
+  for(const r of draft.legacy||[]){const row=document.createElement('div');row.className='answer-item';const name=document.createElement('strong'),answer=document.createElement('p');name.textContent=r.id==='housing'?'기존 집·비용 조건':'기존 안전·환경 조건';answer.textContent=r.answer;row.append(name,answer);$('answer-summary').append(row);}
  }
  world?.present({mode,focus:mode==='detail'?draft.focus:null});world?.sync();expose();
 }
@@ -106,7 +110,8 @@ function nextQuestion(){const c=CATEGORIES.find(c=>c.id===order[step]);debugEven
 $('question-next').addEventListener('click',nextQuestion);
 $('question-prev').addEventListener('click',()=>{step=Math.max(0,step-1);render();});
 $('question-unknown').addEventListener('click',()=>{draft.answers[order[step]]='';nextQuestion();});
-$('continue-workspace').addEventListener('click',async()=>{if(mode!=='review'||!entryReady(draft))return;draft.handoff=true;save();$('continue-workspace').disabled=true;await debugEvent('village_confirmed',{entry:draft.entry,location:draft.location,candidates:draft.entry==='discover'?[]:draft.candidates,blocks:draft.blocks,answers:draft.answers,request:buildRequest(draft)});location.assign('/analysis');});
+$('extra-request').addEventListener('input',event=>{draft.extra=event.target.value;draft.handoff=false;save();});
+$('continue-workspace').addEventListener('click',async()=>{if(mode!=='review'||!entryReady(draft))return;const request=buildRequest(draft);if(request.length>4000){$('review-note').textContent='조건이 길어졌어요. 입력 내용을 조금 줄여 주세요.';return;}draft.handoff=true;save();$('continue-workspace').disabled=true;await debugEvent('village_confirmed',{entry:draft.entry,location:draft.location,candidates:draft.entry==='discover'?[]:draft.candidates,blocks:draft.blocks,answers:draft.answers,request});location.assign('/analysis');});
 $('turn-left').addEventListener('click',()=>world?.rotate(-Math.PI/4));$('turn-right').addEventListener('click',()=>world?.rotate(Math.PI/4));
 $('zoom-in').addEventListener('click',()=>world?.zoom(1.15));$('zoom-out').addEventListener('click',()=>world?.zoom(1/1.15));
 document.addEventListener('keydown',event=>{if(mode==='town'&&event.key.toLowerCase()==='f'&&!['INPUT','TEXTAREA'].includes(event.target.tagName)){if(document.fullscreenElement)document.exitFullscreen?.();else $('scene-wrap').requestFullscreen?.();}});

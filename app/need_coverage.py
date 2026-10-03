@@ -26,11 +26,13 @@ METRIC_ASPECTS = {
     **{m:'straight_distance' for m in ('grocery_straight_line_distance_m',
         'house_to_grocery_straight_line_distance_m','convenience_straight_line_distance_m',
         'bus_stop_straight_line_distance_m','school_straight_line_distance_m',
-        'park_straight_line_distance_m','library_straight_line_distance_m','meeting_straight_line_distance_m')},
+        'park_straight_line_distance_m','library_straight_line_distance_m','meeting_straight_line_distance_m',
+        'pharmacy_straight_line_distance_m','clinic_straight_line_distance_m',
+        'everyday_meal_straight_line_distance_m','restaurant_straight_line_distance_m')},
     'academy_count_within_radius':'facility_count',
 }
-GROUPS={'living':'생활·건강','transport':'교통·동선','education':'교육·육아',
-        'safety':'안전·환경','leisure':'여가·관계','housing':'집·비용'}
+GROUPS={'living':'생활·장보기','transport':'교통·동선','education':'교육·육아',
+        'safety':'안전·환경', 'leisure':'여가·관계', 'housing':'집·비용', 'health':'건강·의료', 'dining':'식사·외식'}
 DEFAULT_GROUP={'facility_fit':'living','walking_route':'transport','travel_time':'transport',
                'transfer':'transport','school_assignment':'education','environment':'safety','housing':'housing'}
 LABELS={'facility_fit':'시설의 실제 이용 조건','walking_route':'실제 보행 경로',
@@ -64,7 +66,7 @@ def required_sources(sources):
     def is_scaffold(text):
         return text in scaffold or text in (
             '아래 카테고리만 선택했어.', '중요도는 내가 배치해서 정한 값이며 임의 변경하지 마.') or bool(re.fullmatch(
-            r'(생활·건강|교통·동선|교육·육아|안전·환경|여가·관계|집·비용): (중요도 [\d.]+, 상대 비중 [\d.]+%|점수 비중 0, 실거래 참고)\.',text))
+            r'(생활·건강|생활·장보기|교통·동선|교육·육아|안전·환경|건강·의료|여가·관계|집·비용|식사·외식): (중요도 [\d.]+, 상대 비중 [\d.]+%|점수 비중 0, 실거래 참고)\.',text))
     return [key for key,text in sources.items() if not is_scaffold(text)]
 
 
@@ -105,7 +107,7 @@ def review_needs(profile, sources, needs=None, required_ids=(), previous=None, a
             raise RunnerError('unrepresented_context_need')
         if n.handling=='research' and not any(c['key'] in n.context_keys and c['value']=='requested' and
             c['key'] in ('qualitative_research_requested','education_research','safety_research','leisure_research',
-                         'transport_research','housing_research','extension_research')
+                         'transport_research','housing_research','extension_research','health_research','dining_research')
             for c in doc['context']):raise RunnerError('unrepresented_research_need')
         by_source[n.source_id].append(n)
 

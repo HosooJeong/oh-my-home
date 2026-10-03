@@ -22,7 +22,7 @@ test('unknown internal weight remains in the denominator and cannot inflate a pa
 });
 test('verified zero stays at the centre; unselected and price reference axes remain empty',()=>{
  const p=profile(),[view]=views(p,{a:{mart:1500,clinic:1500,school:500}}),report=categoryReports(p,view,['living','education','housing']),g=radarGeometry(report);
- assert.equal(report[0].score,0);assert.deepEqual(g.point(0,report[0].score),[220,202]);assert.equal(report[3].status,'unselected');assert.equal(report[5].status,'reference');assert.equal(report[5].score,null);
+ assert.equal(report[0].score,0);assert.deepEqual(g.point(0,report[0].score),[220,202]);assert.equal(report[3].status,'unselected');assert.equal(report.find(c=>c.id==='housing').status,'reference');assert.equal(report.find(c=>c.id==='housing').score,null);
 });
 test('candidate switch uses its own evidence, never the first candidate measurement',()=>{
  const p=profile(),v=views(p,{a:{mart:500,clinic:500,school:500},b:{mart:1500,clinic:1000,school:null}}),a=categoryReports(p,v[0],['living']),b=categoryReports(p,v[1],['living']);
@@ -36,10 +36,10 @@ test('foreign or mismatched evidence is not drawn as verified fulfilment',()=>{
  const p=profile(),[v]=views(p,{a:{mart:500,clinic:500,school:500}});v.rows[0].known=false;v.rows[0].fit=null;const r=categoryReports(p,v,['living']);assert.equal(r[0].score,null);assert.ok(Math.abs(r[0].range[0]-75)<1e-9);assert.ok(Math.abs(r[0].range[1]-100)<1e-9);
 });
 test('price-only reference retains hard unknown and never synthesizes a house score',()=>{
- const p={groups:[{id:'housing',weight:0}],criteria:[{...criterion('budget','housing'),hard:{operator:'lte',value:4e8}}]},r=categoryReports(p,null,['housing']);assert.equal(r[5].score,null);assert.equal(r[5].hardUnknown.length,1);assert.equal(r[5].rows[0].reason,'집별 조건 미확인');
+ const p={groups:[{id:'housing',weight:0}],criteria:[{...criterion('budget','housing'),hard:{operator:'lte',value:4e8}}]},r=categoryReports(p,null,['housing']);const h=r.find(c=>c.id==='housing');assert.equal(h.score,null);assert.equal(h.hardUnknown.length,1);assert.equal(h.rows[0].reason,'집별 조건 미확인');
 });
 test('additional groups stay in the report while the hexagon keeps six fixed axes',()=>{
- const p=profile();p.groups.push({id:'extension',label:'추가 요소',weight:10});p.criteria.push(criterion('other','extension'));const [v]=views(p,{a:{mart:500,clinic:500,school:500,other:500}}),r=categoryReports(p,v,['extension']);assert.equal(r.length,7);assert.equal(r[6].score,100);assert.equal(radarGeometry(r).axes.length,6);
+ const p=profile();p.groups.push({id:'extension',label:'추가 요소',weight:10});p.criteria.push(criterion('other','extension'));const [v]=views(p,{a:{mart:500,clinic:500,school:500,other:500}}),r=categoryReports(p,v,['extension']);assert.equal(r.length,8);assert.equal(r.find(c=>c.id==='extension').score,100);assert.equal(radarGeometry(r).axes.length,6);
 });
 test('qualitative notes require category-bound request IDs and remain distinct from candidate scores',()=>{
  const requests=[{id:'living_r',module:'living'},{id:'school_r',module:'education'},{id:'safety_r',module:'safety'},{id:'hobby_r',module:'leisure',criterion_ids:['hobby']}],data={items:[{facility_id:'mart',excerpts:[{quote:'생활',request_ids:['living_r']},{quote:'학원',request_ids:['school_r']},{quote:'연결 없음'}]}],safety:{items:[{area_name:'지역',excerpts:[{quote:'안전',request_ids:['safety_r']}]}]},leisure:{discoveries:[{name:'후보',criterion_id:'hobby',note:'날짜 미확인',excerpts:[]},{name:'취미',excerpts:[{quote:'경험',request_ids:['hobby_r']}]}]}};
@@ -96,4 +96,19 @@ test('overview explains the selected candidate and highest-priority confirmed ne
  const rows=[distanceRow(),distanceRow('grocery_straight_line_distance_m',{weight:.3,fact:{value:82,unit:'m',source_record:'mart:a'},facilities:[{id:'mart:a',name:'시험 마트'}]}),distanceRow('park_straight_line_distance_m',{weight:0}),distanceRow('school_straight_line_distance_m',{known:false,fit:null,weight:.9})],view={rows},before=structuredClone(view);
  const reasons=overviewReasons(view);assert.equal(reasons.length,2);assert.match(reasons[0],/씨유 시험점/);assert.match(reasons[1],/시험 마트.*82m/);assert.deepEqual(view,before);
  rows[0].fact.source_record='shop:b';rows[0].facilities=[{id:'shop:b',name:'비교 집 편의점'}];assert.match(overviewReasons(view)[0],/비교 집 편의점/);assert.doesNotMatch(overviewReasons(view)[0],/씨유 시험점/);
+});
+
+test('six fully verified categories close every edge including the last-to-first edge; target and score remain independent',()=>{
+ const ids=['living','transport','education','health','leisure','dining'],p={groups:ids.map((id,i)=>({id,label:id,weight:i===1?50:10})),criteria:ids.map(id=>criterion(id,id)),context:[],questions:[]};
+ const values=Object.fromEntries(ids.map((id,i)=>[id,500+i*100]));const [v]=views(p,{a:values});const reports=categoryReports(p,v,ids),geo=radarGeometry(reports);
+ assert.equal(geo.complete,true);assert.equal(geo.actual.length,6);assert.equal(geo.target.length,6);
+ assert.deepEqual(geo.actual[5],[geo.point(5,reports[5].score),geo.point(0,reports[0].score)]);
+ assert.deepEqual(reports.map(c=>c.target),[100,100,100,100,100,100]);
+ values.health=null;const [partial]=views(p,{a:values});const open=radarGeometry(categoryReports(p,partial,ids));
+ assert.equal(open.complete,false);assert.equal(open.axes[3].score,null);assert.equal(open.actual.length,4);
+});
+test('medical and dining explanations disclose registered access without medical quality, taste or current-operation claims',()=>{
+ for(const [metric,id,limitation] of [['clinic_straight_line_distance_m','health',/진료 수준·응급 대응/],['everyday_meal_straight_line_distance_m','dining',/맛·가격·식단 적합성/]]){
+  const row=distanceRow(metric);const text=criterionReason(row);assert.match(text,/직선거리 220m/);assert.doesNotMatch(text,/치료를 잘|맛있는|운영 중|도보/);assert.match(categoryScope({id,rows:[row]}),limitation);
+ }
 });

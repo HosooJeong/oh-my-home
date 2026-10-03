@@ -2,16 +2,24 @@
 import {readCandidates} from './entry-places.mjs';
 export const STORAGE_KEY='saljari.village.v1';
 export const CATEGORIES=Object.freeze([
- {id:'living',label:'생활·건강',short:'생활',color:'#e49375',angle:-150,question:'일상에서 가까웠으면 하는 곳은 어디인가요?',placeholder:'큰 마트에서 자주 장을 봐요. 걸어서 10분 정도면 좋겠어요.',examples:[
+ {id:'living',label:'생활·장보기',short:'생활',color:'#e49375',angle:-150,question:'장을 보는 곳은 얼마나 가까우면 좋을까요?',placeholder:'편의점을 자주 이용해요. 집 바로 가까이에 있으면 좋겠어요.',examples:[
   {label:'마트 가까이',text:'마트가 가까운 게 중요해요. 편의점은 조금 멀어도 괜찮아요.'},
   {label:'편의점 가까이',text:'편의점을 자주 이용해요. 편의점이 가까운 게 더 중요하고, 마트는 조금 멀어도 괜찮아요.'},
   {label:'둘 다 비슷하게',text:'마트와 편의점이 모두 가까우면 좋겠어요. 두 곳의 접근성을 비슷하게 중요하게 생각해요.'},
  ]},
  {id:'transport',label:'교통·동선',short:'교통',color:'#e9bc62',angle:-90,question:'주로 어디로, 어떻게 이동하시나요?',placeholder:'버스로 출퇴근해요. 정류장이 가깝고 환승이 적으면 좋겠어요.'},
  {id:'education',label:'교육·육아',short:'교육',color:'#7babc4',angle:-30,question:'학교·학원·통학에서 무엇이 중요한가요?',placeholder:'초등학생 아이가 있어요. 학교와 영어 학원이 가까우면 좋겠어요.'},
- {id:'safety',label:'안전·환경',short:'안전',color:'#9c9ac5',angle:30,question:'확인하고 싶은 주변 환경이 있나요?',placeholder:'저녁에 걸어 다녀요. 야간 보행과 주변 소음이 신경 쓰여요.'},
+ {id:'health',label:'건강·의료',short:'의료',color:'#9c9ac5',angle:30,question:'가까이 있으면 좋은 의료시설은 무엇인가요?',placeholder:'약국과 내과·소아과 의원이 가까우면 좋겠어요.',examples:[
+  {label:'약국 가까이',text:'약국이 집 가까이에 있으면 좋겠어요.'},
+  {label:'의원 가까이',text:'내과·소아과 의원이 가까우면 좋겠어요.'},
+  {label:'둘 다 가까이',text:'약국과 내과·소아과 의원이 모두 가까우면 좋겠어요. 두 곳의 접근성을 비슷하게 중요하게 생각해요.'},
+ ]},
  {id:'leisure',label:'여가·관계',short:'여가',color:'#87b49a',angle:90,question:'즐기는 취미나 자주 찾는 장소가 있나요?',placeholder:'탁구를 즐겨요. 자유롭게 이용할 곳과 산책할 공원이 있으면 좋겠어요.'},
- {id:'housing',label:'집·비용',short:'비용',color:'#ba9b7d',angle:150,question:'주거 형태·면적·예산은 어떻게 생각하시나요?',placeholder:'아파트 전세를 생각해요. 주변 실거래가를 참고하고 싶어요.'},
+ {id:'dining',label:'식사·외식',short:'식사',color:'#ba9b7d',angle:150,question:'집 근처에서 어떤 식사를 하고 싶으세요?',placeholder:'퇴근 후 간단히 먹을 백반이나 분식집이 가까우면 좋겠어요.',examples:[
+  {label:'평소 식사',text:'백반이나 국·탕, 분식처럼 평소 간단히 식사할 곳이 집 가까이에 있으면 좋겠어요.'},
+  {label:'외식 가까이',text:'집 근처에서 외식하고 싶어요. 음식점이 가까우면 좋겠어요.'},
+  {label:'식사 바로 가까이',text:'퇴근 후 간단히 먹을 백반이나 분식집이 집 바로 가까이에 있으면 좋겠어요.'},
+ ]},
 ]);
 export const RADII=Object.freeze([2.4,3.6,4.8,6,7.2]);
 export const FLOOR_LIMIT=7.9;
@@ -30,7 +38,7 @@ export function shares(blocks){
  values.slice().sort((a,b)=>b.remainder-a.remainder||a.id.localeCompare(b.id)).slice(0,remaining).forEach(v=>v.value++);
  return Object.fromEntries(values.map(v=>[v.id,v.value/10]));
 }
-export function emptyDraft(){return {version:1,entry:null,location:'',candidates:[],blocks:[],answers:{},focus:null,handoff:false};}
+export function emptyDraft(){return {version:1,taxonomy:2,entry:null,location:'',candidates:[],blocks:[],answers:{},extra:'',legacy:[],focus:null,handoff:false};}
 export function placement(x,z,others=[]){
  if(!Number.isFinite(x)||!Number.isFinite(z))return null;
  let radius=Math.hypot(x,z),angle=radius?Math.atan2(z,x):0;
@@ -67,13 +75,17 @@ export function readDraft(serialized){
  try{
   const saved=JSON.parse(serialized);if(saved?.version!==1||!Array.isArray(saved.blocks))return emptyDraft();
   const draft=emptyDraft();draft.entry=saved.entry==='known'?'multiple':['single','multiple','discover'].includes(saved.entry)?saved.entry:null;draft.location=text(saved.location,200);
+  draft.extra=text(saved.extra,300);
+  draft.legacy=(Array.isArray(saved.legacy)?saved.legacy:[]).filter(r=>['safety','housing'].includes(r?.id)&&typeof r.answer==='string').slice(0,2).map(r=>({id:r.id,answer:text(r.answer,450),importance:r.id==='housing'?0:Number.isFinite(r.importance)&&r.importance>=0&&r.importance<=100?r.importance:60}));
+  if(saved.taxonomy!==2)for(const id of ['safety','housing']){const b=saved.blocks.find(b=>b?.id===id);if(b&&!draft.legacy.some(r=>r.id===id))draft.legacy.push({id,answer:text(saved.answers?.[id],450)||'기존에 선택한 분야예요. 확인할 내용을 다시 정하고 싶어요.',importance:id==='housing'?0:Number.isFinite(b.x)&&Number.isFinite(b.z)?rawWeight(b):60});}
   draft.candidates=readCandidates(saved.candidates);
   for(const b of saved.blocks.slice(0,6))if(ids.has(b?.id)&&!draft.blocks.some(v=>v.id===b.id)){
    const p=placement(b.x,b.z,draft.blocks);if(p)draft.blocks.push({id:b.id,...p});
   }
   draft.focus=draft.blocks.some(b=>b.id===saved.focus)?saved.focus:draft.blocks[0]?.id||null;
   for(const c of CATEGORIES)draft.answers[c.id]=text(saved.answers?.[c.id],450);
-  draft.handoff=saved.handoff===true;return draft;
+  // Changed categories require a fresh review; never turn an old safety/cost answer into a new need.
+  draft.handoff=saved.handoff===true&&saved.taxonomy===2;return draft;
  }catch{return emptyDraft();}
 }
 export function buildRequest(draft){
@@ -84,6 +96,8 @@ export function buildRequest(draft){
  lines.push('아래 카테고리만 선택했어. 중요도는 내가 배치해서 정한 값이며 임의 변경하지 마.');
  for(const b of draft.blocks){const c=CATEGORIES.find(c=>c.id===b.id);lines.push(`${c.label}: ${b.id==='housing'?'점수 비중 0, 실거래 참고':`중요도 ${rawWeight(b)}, 상대 비중 ${summary[b.id]}%`}. ${draft.answers[b.id]?.trim()||'세부 조건은 아직 모르겠어. 필요한 내용만 질문해 줘.'}`);}
  if(draft.blocks.some(b=>b.id==='housing'))lines.push('집·비용은 실거래 참고만 필요하고 가격 점수/실제 매물 추천은 제외해 줘.');
+ for(const r of draft.legacy||[])lines.push('기존 추가 조건 '+(r.id==='housing'?'집·비용(실거래 참고)':'안전·환경(중요도 '+r.importance+')')+': '+r.answer);
+ if(draft.extra?.trim())lines.push('추가로 확인할 내용: '+draft.extra.trim());
  return lines.join('\n');
 }
 export function evaluationShares(blocks){return {...shares(blocks.filter(b=>b.id!=='housing')),...(blocks.some(b=>b.id==='housing')?{housing:0}:{})};}

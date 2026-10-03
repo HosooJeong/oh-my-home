@@ -5,6 +5,10 @@ const valid=r=>r.known&&finite(r.fit)&&r.fit>=0&&r.fit<=1;
 const node=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;};
 export const percentage=n=>finite(n)?n.toFixed(1).replace(/\.0$/,'')+'%':'미확인';
 const distancePreferences={
+ pharmacy_straight_line_distance_m:['약국','약국이 가까운 생활을 원하는 선호'],
+ clinic_straight_line_distance_m:['내과·소아과 의원','의원이 가까운 생활을 원하는 선호'],
+ everyday_meal_straight_line_distance_m:['평소 식사할 곳','평소 식사할 곳이 가까웠으면 하는 선호'],
+ restaurant_straight_line_distance_m:['음식점','외식할 곳이 가까웠으면 하는 선호'],
  convenience_straight_line_distance_m:['편의점','편의점이 가까운 생활을 원하는 선호'],
  grocery_straight_line_distance_m:['마트','장보는 곳이 가까운 생활을 원하는 선호'],
  house_to_grocery_straight_line_distance_m:['마트','장보는 곳이 가까운 생활을 원하는 선호'],
@@ -53,7 +57,9 @@ export function overviewReasons(view){
 export function categoryScope(category){
  const metrics=new Set(category.rows.filter(valid).map(r=>r.criterion.metric)),notes=[];
  if([...metrics].some(m=>distancePreferences[m]))notes.push('거리 평가는 위치 간 직선거리 기준이며 실제 이동 경로·시간은 미확인이에요.');
- if(category.id==='living'&&metrics.size)notes.push('매장의 현재 영업 여부는 별도 확인이 필요해요.');
+ if(['living','health','dining'].includes(category.id)&&metrics.size)notes.push('매장의 현재 영업 여부는 별도 확인이 필요해요.');
+ if(category.id==='health'&&metrics.size)notes.push('등록 업종의 접근성 비교이며 실제 진료과·진료 수준·응급 대응은 평가하지 않아요.');
+ if(category.id==='dining'&&metrics.size)notes.push('등록 음식점의 접근성 비교이며 맛·가격·식단 적합성은 평가하지 않아요.');
  if(metrics.has('bus_stop_straight_line_distance_m'))notes.push('이용할 노선·방향·배차는 아직 확인하지 않았어요.');
  if(metrics.has('school_straight_line_distance_m'))notes.push('가까운 학교가 배정 학교를 뜻하지는 않으며 통학로 안전은 별도 확인이 필요해요.');
  if(metrics.has('academy_count_within_radius'))notes.push('등록된 선택지 비교이며 수업의 질·현재 모집 여부를 평가한 결과는 아니에요.');
@@ -116,7 +122,7 @@ export function renderRadar(root,categories){
   const value=shape('text',{x:p[0],y:p[1]+19,'text-anchor':'middle',class:'radar-value'});value.textContent=a.score!==null?percentage(a.score):{reference:'참고',unselected:'미선택',partial:'일부 미확인',unknown:'미확인'}[a.status];svg.append(value);
  });
  const legend=node('div',undefined,'radar-legend');legend.append(node('span','내 목표','target'),node('span','확인된 충족도','actual'));if(geo.axes.some(a=>a.target!==null&&a.score===null))legend.append(node('span','미확인 범위','unknown'));
- root.replaceChildren(svg,...(geo.axes.some(a=>a.target!==null)?[legend]:[]),node('figcaption',geo.axes.some(a=>a.target!==null)?'목표 100 · 미확인은 빈 구간':'실거래 참고 · 집별 충족도 미평가','quiet'));
+ root.replaceChildren(svg,...(geo.axes.some(a=>a.target!==null)?[legend]:[]),node('figcaption',geo.complete?'내 기준 대비 충족도':geo.axes.some(a=>a.target!==null)?'목표 100 · 미확인은 빈 구간':'수치 평가 조건 미설정','quiet'));
 }
 
 function scoreText(c){return c.score!==null?'목표 대비 '+percentage(c.score):c.status==='reference'?'실거래 참고':c.status==='unselected'?'미선택':c.range&&c.coverage>0?'일부 미확인 · 가능한 충족도 '+percentage(c.range[0])+'–'+percentage(c.range[1]):'목표 충족 여부 미확인';}

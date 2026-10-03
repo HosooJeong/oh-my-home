@@ -12,7 +12,7 @@ Weight = Annotated[FiniteFloat, Field(ge=0, le=100)]
 Identifier = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_-]{0,63}$")]
 Text = Annotated[str, Field(min_length=1, max_length=4000)]
 SourceURL = Annotated[str, Field(pattern=r"^https?://[^\s]+$")]
-CATEGORIES = ("housing", "transport", "education", "living", "safety", "leisure")
+CATEGORIES = ("living", "transport", "education", "health", "leisure", "dining")
 
 
 class Contract(BaseModel):

@@ -24,6 +24,7 @@ from .preference_edits import PreservationError, edited, edit_quote, preserve_ne
 from .modules.living import LivingModule, ShopIndex
 from .modules.transport import StopIndex, TransportModule
 from .modules.housing import HousingIndex, HousingModule, HousingQuery
+from .modules.registered_access import RegisteredAccessModule
 from .modules.education import EducationIndex, EducationModule
 from .education_preferences import EducationInput, education_profile
 from .modules.safety import CctvIndex, SafetyModule, context_value
@@ -141,7 +142,9 @@ class AppState:
         self.leisure_index = leisure_index if leisure_index is not None else LeisureIndex()
         self.orchestrator = Orchestrator({"living": LivingModule(index), "transport": TransportModule(self.stop_index),
                                         "housing": self.housing, 'education': EducationModule(self.education_index),
-                                        'safety':self.safety,'leisure':LeisureModule(self.leisure_index)}, reference_modules={"housing": self.housing, 'safety':self.safety})
+                                        'safety':self.safety,'leisure':LeisureModule(self.leisure_index),
+                                        'health':RegisteredAccessModule('health',index),
+                                        'dining':RegisteredAccessModule('dining',index)}, reference_modules={"housing": self.housing, 'safety':self.safety})
         self.lock, self.sessions = Lock(), {}
         self.active_job = None
         self.debug_transcripts = debug_transcripts
@@ -341,7 +344,7 @@ class AppState:
                         raise RunnerError('cancelled')
                     mark(ids,'running')
                     try:
-                        if module in ('living','education','facility_reviews'):
+                        if module in ('living','education','health','dining','facility_reviews'):
                             value=research_reviews(runner,task['facilities'],cancel=cancel,questions=task.get('questions'))
                             result['items'].extend(value.get('items',[]))
                         elif module=='safety':
@@ -350,7 +353,7 @@ class AppState:
                             value=research_leisure(runner,task['scope'],cancel=cancel,index=self.leisure_index);result['leisure']=value
                         for record in [r for r in statuses if r['id'] in ids]:
                             scoped=value
-                            if module in ('living','education','facility_reviews'):
+                            if module in ('living','education','health','dining','facility_reviews'):
                                 scoped={**value,'items':[i for i in value.get('items',[]) if i['facility_id'] in record['facility_ids']]}
                             elif module=='leisure' and record['criterion_ids']:
                                 scoped={**value,'discoveries':[i for i in value.get('discoveries',[]) if i.get('criterion_id') in record['criterion_ids']]}

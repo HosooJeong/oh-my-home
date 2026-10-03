@@ -16,8 +16,12 @@ TARGETS = {
     'park_straight_line_distance_m': r'공원',
     'library_straight_line_distance_m': r'도서관',
     'meeting_straight_line_distance_m': r'모임|만남|지점',
+    'pharmacy_straight_line_distance_m': r'약국',
+    'clinic_straight_line_distance_m': r'내과|소아과|의원',
+    'everyday_meal_straight_line_distance_m': r'백반|한정식|분식|김밥|국[·/]|식사',
+    'restaurant_straight_line_distance_m': r'음식점|식당|외식',
 }
-SUBJECT = re.compile(r'마트|슈퍼|편의점|정류장|학교|학원|교습소|공원|도서관|필라테스|헬스|탁구|수영|가족\s*모임')
+SUBJECT = re.compile(r'마트|슈퍼|편의점|정류장|학교|학원|교습소|공원|도서관|필라테스|헬스|탁구|수영|가족\s*모임|약국|내과|소아과|의원|백반|분식|식사|음식점|식당|외식')
 QUALIFIER = re.compile(r'비중|중요|두\s*(?:조건|곳)|둘|접근성|비슷|동일|거리|기준|이내|이상|이하|필수|상관\s*없|유형')
 MANDATORY = re.compile(r'필수|반드시|무조건|해야|여야|넘지\s*않')
 NUMBER = r'[-+]?\d+(?:,\d{3})*(?:\.\d+)?'
